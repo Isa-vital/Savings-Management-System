@@ -8,17 +8,17 @@
             </li>
             <li class="nav-item">
                 <a class="nav-link" href="memberslist.php">
-                    <i class="fas fa-users me-2"></i>Members
+                    <i class="fas fa-users me-2"></i>Group Members
                 </a>
             </li>
             <li class="nav-item">
                 <a class="nav-link" href="savings/savings.php">
-                    <i class="fas fa-wallet me-2"></i>Savings
+                    <i class="fas fa-wallet me-2"></i>Manage Savings
                 </a>
             </li>
             <li class="nav-item">
                 <a class="nav-link" href="loans/loanslist.php">
-                    <i class="fas fa-hand-holding-usd me-2"></i>Loans
+                    <i class="fas fa-hand-holding-usd me-2"></i>Manage Loans
                 </a>
             </li>
             <li class="nav-item">

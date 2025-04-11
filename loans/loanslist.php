@@ -95,8 +95,8 @@ $query = "SELECT l.*,
           COALESCE(SUM(lr.amount), 0) as amount_paid,
           (l.amount - COALESCE(SUM(lr.amount), 0)) as balance
           FROM loans l
-          JOIN members m ON l.member_id = m.id
-          LEFT JOIN users u ON l.processed_by = u.id
+          JOIN memberz m ON l.member_id = m.id
+          LEFT JOIN users u ON l.processed_by = u.user_id
           LEFT JOIN loan_repayments lr ON l.id = lr.loan_id
           $where
           GROUP BY l.id
