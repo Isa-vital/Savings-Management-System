@@ -7,7 +7,7 @@
                 </a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" href="memberslist.php">
+                <a class="nav-link" href="members/memberslist.php">
                     <i class="fas fa-users me-2"></i>Group Members
                 </a>
             </li>

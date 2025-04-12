@@ -16,7 +16,7 @@ if (!isset($_GET['member_id'])) {
 $member_id = intval($_GET['member_id']);
 
 // Fetch member details
-$stmt = $conn->prepare("SELECT id, member_no, full_name FROM members WHERE id = ?");
+$stmt = $conn->prepare("SELECT id, member_no, full_name FROM memberz WHERE id = ?");
 $stmt->bind_param("i", $member_id);
 $stmt->execute();
 $result = $stmt->get_result();

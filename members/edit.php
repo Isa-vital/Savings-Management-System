@@ -8,16 +8,17 @@ if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'admin') {
 }
 
 // Check if member ID is provided
-if (!isset($_GET['id'])) {
+if (!isset($_GET['member_no'])) {
     $_SESSION['error'] = "Member ID not specified";
     redirect('memberslist.php');
 }
 
-$member_id = intval($_GET['id']);
+$member_no = intval($_GET['member_no']);
+
 
 // Fetch member details
-$stmt = $conn->prepare("SELECT * FROM members WHERE id = ?");
-$stmt->bind_param("i", $member_id);
+$stmt = $conn->prepare("SELECT * FROM memberz WHERE member_no = ?");
+$stmt->bind_param("s", $_GET['member_no']);
 $stmt->execute();
 $result = $stmt->get_result();
 $member = $result->fetch_assoc();
@@ -87,7 +88,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         // Update member record
-        $stmt = $conn->prepare("UPDATE members SET 
+        $stmt = $conn->prepare("UPDATE memberz SET 
             full_name = ?, nin_number = ?, phone = ?, email = ?,
             district = ?, subcounty = ?, village = ?, gender = ?,
             dob = ?, occupation = ?, next_of_kin_name = ?, next_of_kin_contact = ?
@@ -106,7 +107,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $occupation,
             $next_of_kin_name,
             $next_of_kin_contact,
-            $member_id
+            $member_no
         );
         
         if (!$stmt->execute()) {
@@ -123,7 +124,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         $conn->commit();
         $_SESSION['success'] = "Member updated successfully";
-        redirect('view.php?id=' . $member_id);
+        redirect('view.php?id=' . $member_no);
         
     } catch (Exception $e) {
         $conn->rollback();
@@ -170,7 +171,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <i class="fas fa-user-edit me-2"></i>Edit Member
                     </h1>
                     <div class="btn-toolbar mb-2 mb-md-0">
-                        <a href="view.php?id=<?= $member['id'] ?>" class="btn btn-secondary">
+                        <a href="view.php?id=<?= $member['member_no'] ?>" class="btn btn-secondary">
                             <i class="fas fa-times me-1"></i> Cancel
                         </a>
                     </div>
@@ -301,7 +302,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             </div>
 
                             <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
-                                <a href="view.php?id=<?= $member['id'] ?>" class="btn btn-secondary me-md-2">
+                                <a href="view.php?id=<?= $member['member_no'] ?>" class="btn btn-secondary me-md-2">
                                     <i class="fas fa-times me-1"></i> Cancel
                                 </a>
                                 <button type="submit" class="btn btn-primary">

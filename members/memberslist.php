@@ -9,19 +9,23 @@ if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'admin') {
 
 // Handle member deletion
 if (isset($_GET['delete'])) {
-    $member_id = intval($_GET['delete']);
+    $member_no = sanitize($_GET['delete']);
     
     $conn->begin_transaction();
     try {
         // First delete from savings table (foreign key constraint)
         $stmt = $conn->prepare("DELETE FROM savings WHERE member_id = ?");
-        $stmt->bind_param("i", $member_id);
-        $stmt->execute();
+        $stmt->bind_param("s", $member_no);
+        if (!$stmt->execute()) {
+            throw new Exception("Failed to delete savings records");
+        }
         
         // Then delete from members table
-        $stmt = $conn->prepare("DELETE FROM members WHERE id = ?");
-        $stmt->bind_param("i", $member_id);
-        $stmt->execute();
+        $stmt = $conn->prepare("DELETE FROM memberz WHERE member_no = ?");
+        $stmt->bind_param("s", $member_no);
+        if (!$stmt->execute()) {
+            throw new Exception("Failed to delete member");
+        }
         
         $conn->commit();
         $_SESSION['success'] = "Member deleted successfully";
@@ -49,19 +53,24 @@ if (isset($_GET['search'])) {
 }
 
 // Fetch members with their total savings
-$query = "SELECT m.id, m.member_no, m.full_name, m.phone, m.gender, m.occupation, 
+$query = "SELECT m.member_no, m.full_name, m.phone, m.gender, m.occupation, 
           COALESCE(SUM(s.amount), 0) as total_savings
           FROM memberz m
-          LEFT JOIN savings s ON m.id = s.member_id
+          LEFT JOIN savings s ON m.member_no = s.member_id
           $where
-          GROUP BY m.id
+          GROUP BY m.member_no
           ORDER BY m.full_name ASC";
 
 $stmt = $conn->prepare($query);
 if (!empty($params)) {
     $stmt->bind_param($types, ...$params);
 }
-$stmt->execute();
+
+if (!$stmt->execute()) {
+    $_SESSION['error'] = "Failed to fetch members: " . $conn->error;
+    redirect('memberslist.php');
+}
+
 $result = $stmt->get_result();
 $members = $result->fetch_all(MYSQLI_ASSOC);
 ?>
@@ -118,7 +127,6 @@ $members = $result->fetch_all(MYSQLI_ASSOC);
                             <i class="fas fa-user-plus me-1"></i> Add New Member
                         </a>
                     </div>
-                    
                 </div>
 
                 <?php if (isset($_SESSION['success'])): ?>
@@ -184,19 +192,19 @@ $members = $result->fetch_all(MYSQLI_ASSOC);
                                                 </td>
                                                 <td class="action-btns">
                                                     <div class="d-flex gap-2">
-                                                        <a href="view.php?id=<?= $member['id'] ?>" 
+                                                        <a href="view.php?member_no=<?= $member['member_no'] ?>" 
                                                            class="btn btn-sm btn-info" title="View">
                                                             <i class="fas fa-eye"></i>
                                                         </a>
-                                                        <a href="edit.php?id=<?= $member['id'] ?>" 
+                                                        <a href="edit.php?member_no=<?= $member['member_no'] ?>" 
                                                            class="btn btn-sm btn-primary" title="Edit">
                                                             <i class="fas fa-edit"></i>
                                                         </a>
-                                                        <a href="savings.php?member_id=<?= $member['id'] ?>" 
+                                                        <a href="savings.php?member_no=<?= $member['member_no'] ?>" 
                                                            class="btn btn-sm btn-warning" title="Manage Savings">
                                                             <i class="fas fa-wallet"></i>
                                                         </a>
-                                                        <button onclick="confirmDelete(<?= $member['id'] ?>)" 
+                                                        <button onclick="confirmDelete('<?= $member['member_no'] ?>')" 
                                                                 class="btn btn-sm btn-danger" title="Delete">
                                                             <i class="fas fa-trash-alt"></i>
                                                         </button>
@@ -248,9 +256,9 @@ $members = $result->fetch_all(MYSQLI_ASSOC);
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         // Delete confirmation
-        function confirmDelete(memberId) {
+        function confirmDelete(member_no) {
             const deleteBtn = document.getElementById('deleteBtn');
-            deleteBtn.href = `memberslist.php?delete=${memberId}`;
+            deleteBtn.href = `memberslist.php?delete=${member_no}`;
             const modal = new bootstrap.Modal(document.getElementById('deleteModal'));
             modal.show();
         }
