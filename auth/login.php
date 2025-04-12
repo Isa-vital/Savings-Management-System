@@ -1,69 +1,42 @@
 <?php
-require_once '../config.php';
+// Start session before destroying it
+session_start();
 
-// If already logged in, redirect to dashboard
-if (isset($_SESSION['user'])) {
-    redirect('../index.php');
+// Verify config path (adjust according to your structure)
+$config_path = realpath(__DIR__ . '/../config.php');
+if (!$config_path || !file_exists($config_path)) {
+    die('Configuration file not found');
+}
+require_once $config_path;
+
+// Destroy session completely
+$_SESSION = [];
+if (ini_get("session.use_cookies")) {
+    $params = session_get_cookie_params();
+    setcookie(session_name(), '', time() - 42000,
+        $params["path"], $params["domain"],
+        $params["secure"], $params["httponly"]
+    );
+}
+session_destroy();
+
+// Clear output buffers
+while (ob_get_level()) {
+    ob_end_clean();
 }
 
-// Handle form submission
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $username = sanitize($_POST['username']);
-    $password = sanitize($_POST['password']);
+// Prevent caching and redirect
+header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
+header("Cache-Control: post-check=0, pre-check=0", false);
+header("Pragma: no-cache");
 
-    // TEMPORARY: Hardcoded admin credentials (remove in production)
-    $valid_username = 'admin';
-    $valid_password_hash = password_hash('admin123', PASSWORD_BCRYPT);
-    
-    if ($username === $valid_username && password_verify('admin123', $valid_password_hash)) {
-        $_SESSION['user'] = [
-            'id' => 1,
-            'username' => $username,
-            'role' => 'admin',
-            'email' => 'admin@sacco.com',
-            'ip' => $_SERVER['REMOTE_ADDR']
-        ];
-        redirect('../index.php');
-    } else {
-        $error = "Invalid credentials";
-    }
+// Verify login.php exists (debugging)
+$login_path = realpath($_SERVER['DOCUMENT_ROOT'] . '/savingssystem/auth/login.php');
+if (!$login_path) {
+    die('Login page not found at: ' . $_SERVER['DOCUMENT_ROOT'] . '/savingssystem/auth/login.php');
 }
+
+// Force redirect to login page
+header("Location: /savingssystem/auth/login.php");
+exit();
 ?>
-
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Login - Savings Mgt System</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-</head>
-<body>
-    <div class="container mt-5">
-        <div class="row justify-content-center">
-            <div class="col-md-6">
-                <div class="card">
-                    <div class="card-header">
-                        <h4>System Login</h4>
-                    </div>
-                    <div class="card-body">
-                        <?php if (isset($error)): ?>
-                            <div class="alert alert-danger"><?= $error ?></div>
-                        <?php endif; ?>
-                        
-                        <form method="POST">
-                            <div class="mb-3">
-                                <label class="form-label">Username</label>
-                                <input type="text" name="username" class="form-control" required>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label">Password</label>
-                                <input type="password" name="password" class="form-control" required>
-                            </div>
-                            <button type="submit" class="btn btn-primary w-100">Login</button>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</body>
-</html>

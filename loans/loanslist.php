@@ -1,8 +1,13 @@
 <?php
 require_once __DIR__ . '/../config.php';
+require_once '../helpers/auth.php';
 
 // Authentication check
-require_admin();
+if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'admin') {
+    $_SESSION['error'] = "Unauthorized access. Admin privileges required.";
+    header('Location: ../index.php');
+    exit();
+}
 
 // Handle loan status updates
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -10,24 +15,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $loan_id = intval($_POST['loan_id']);
         $new_status = sanitize($_POST['new_status']);
         
-        $conn->begin_transaction();
+        $pdo->beginTransaction();
         try {
-            $stmt = $conn->prepare("UPDATE loans SET status = ?, processed_by = ?, processed_at = NOW() WHERE id = ?");
-            $stmt->bind_param("sii", $new_status, $_SESSION['user']['id'], $loan_id);
-            
-            if (!$stmt->execute()) {
-                throw new Exception("Failed to update loan status");
-            }
+            $stmt = $pdo->prepare("UPDATE loans SET status = :status, processed_by = :processed_by, processed_at = NOW() WHERE id = :loan_id");
+            $stmt->execute([
+                ':status' => $new_status,
+                ':processed_by' => $_SESSION['user']['id'],
+                ':loan_id' => $loan_id
+            ]);
             
             // If approved, create repayment schedule
             if ($new_status === 'approved') {
-                createRepaymentSchedule($conn, $loan_id);
+                createRepaymentSchedule($pdo, $loan_id);
             }
             
-            $conn->commit();
+            $pdo->commit();
             $_SESSION['success'] = "Loan status updated successfully";
         } catch (Exception $e) {
-            $conn->rollback();
+            $pdo->rollBack();
             $_SESSION['error'] = "Error updating loan: " . $e->getMessage();
         }
         redirect('loanslist.php');
@@ -38,22 +43,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 if (isset($_GET['delete'])) {
     $loan_id = intval($_GET['delete']);
     
-    $conn->begin_transaction();
+    $pdo->beginTransaction();
     try {
         // First delete repayments
-        $stmt = $conn->prepare("DELETE FROM loan_repayments WHERE loan_id = ?");
-        $stmt->bind_param("i", $loan_id);
-        $stmt->execute();
+        $stmt = $pdo->prepare("DELETE FROM loan_repayments WHERE loan_id = :loan_id");
+        $stmt->execute([':loan_id' => $loan_id]);
         
         // Then delete the loan
-        $stmt = $conn->prepare("DELETE FROM loans WHERE id = ?");
-        $stmt->bind_param("i", $loan_id);
-        $stmt->execute();
+        $stmt = $pdo->prepare("DELETE FROM loans WHERE id = :loan_id");
+        $stmt->execute([':loan_id' => $loan_id]);
         
-        $conn->commit();
+        $pdo->commit();
         $_SESSION['success'] = "Loan deleted successfully";
     } catch (Exception $e) {
-        $conn->rollback();
+        $pdo->rollBack();
         $_SESSION['error'] = "Error deleting loan: " . $e->getMessage();
     }
     redirect('loanslist.php');
@@ -64,23 +67,19 @@ $search = '';
 $status_filter = '';
 $where_conditions = [];
 $params = [];
-$types = '';
 
 if (isset($_GET['search'])) {
     $search = sanitize($_GET['search']);
     if (!empty($search)) {
-        $where_conditions[] = "(m.member_no LIKE ? OR m.full_name LIKE ? OR l.loan_number LIKE ?)";
-        $search_term = "%$search%";
-        array_push($params, $search_term, $search_term, $search_term);
-        $types .= 'sss';
+        $where_conditions[] = "(m.member_no LIKE :search OR m.full_name LIKE :search OR l.loan_number LIKE :search)";
+        $params[':search'] = "%$search%";
     }
 }
 
 if (isset($_GET['status']) && in_array($_GET['status'], ['pending', 'approved', 'rejected', 'completed'])) {
     $status_filter = sanitize($_GET['status']);
-    $where_conditions[] = "l.status = ?";
-    $params[] = $status_filter;
-    $types .= 's';
+    $where_conditions[] = "l.status = :status";
+    $params[':status'] = $status_filter;
 }
 
 $where = '';
@@ -102,21 +101,16 @@ $query = "SELECT l.*,
           GROUP BY l.id
           ORDER BY l.application_date DESC";
 
-$stmt = $conn->prepare($query);
-if (!empty($params)) {
-    $stmt->bind_param($types, ...$params);
-}
-$stmt->execute();
-$result = $stmt->get_result();
-$loans = $result->fetch_all(MYSQLI_ASSOC);
+$stmt = $pdo->prepare($query);
+$stmt->execute($params);
+$loans = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Function to create repayment schedule
-function createRepaymentSchedule($conn, $loan_id) {
+function createRepaymentSchedule($pdo, $loan_id) {
     // Fetch loan details
-    $stmt = $conn->prepare("SELECT amount, interest_rate, term_months FROM loans WHERE id = ?");
-    $stmt->bind_param("i", $loan_id);
-    $stmt->execute();
-    $loan = $stmt->get_result()->fetch_assoc();
+    $stmt = $pdo->prepare("SELECT amount, interest_rate, term_months FROM loans WHERE id = :loan_id");
+    $stmt->execute([':loan_id' => $loan_id]);
+    $loan = $stmt->fetch(PDO::FETCH_ASSOC);
     
     if (!$loan) {
         throw new Exception("Loan not found");
@@ -134,11 +128,14 @@ function createRepaymentSchedule($conn, $loan_id) {
     // Create repayment schedule
     $due_date = date('Y-m-d', strtotime('+1 month'));
     for ($i = 1; $i <= $term; $i++) {
-        $stmt = $conn->prepare("INSERT INTO loan_repayments 
+        $stmt = $pdo->prepare("INSERT INTO loan_repayments 
                               (loan_id, due_date, amount, status) 
-                              VALUES (?, ?, ?, 'pending')");
-        $stmt->bind_param("isd", $loan_id, $due_date, $monthly_payment);
-        $stmt->execute();
+                              VALUES (:loan_id, :due_date, :amount, 'pending')");
+        $stmt->execute([
+            ':loan_id' => $loan_id,
+            ':due_date' => $due_date,
+            ':amount' => $monthly_payment
+        ]);
         $due_date = date('Y-m-d', strtotime($due_date . ' +1 month'));
     }
 }

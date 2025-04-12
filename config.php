@@ -1,183 +1,124 @@
 <?php
 /**
- * Savings Management System - Configuration File
- * 
- * Handles database connections, sessions, and core functions
+ * Rukindo Kweyamba Savings System - Supercharged Config
+ * Now with PDO Security & Better Performance
  */
 
-// ==================== ERROR REPORTING ====================
+// ==================== CORE SETTINGS ====================
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
+date_default_timezone_set('Africa/Nairobi');
 
-// ==================== SESSION SETUP ====================
+// ==================== SECURE SESSION ====================
 session_start([
-    'cookie_lifetime' => 86400, // 1 day
-    'cookie_secure'   => true,   // Requires HTTPS
-    'cookie_httponly' => true,   // Prevent JS access
-    'use_strict_mode' => true    // Enhanced session security
+    'name' => 'SaccoSecureSession',
+    'cookie_lifetime' => 86400,
+    'cookie_secure' => true,
+    'cookie_httponly' => true,
+    'use_strict_mode' => true
 ]);
 
-// ==================== DATABASE CONFIGURATION ====================
+// ==================== DATABASE (PDO POWER) ====================
 define('DB_HOST', 'localhost');
-define('DB_USER', 'root');
-define('DB_PASS', "");
 define('DB_NAME', 'savings_mgt_systemdb');
-define('DB_PORT', 3306);
+define('DB_USER', 'root');
+define('DB_PASS', '');
+define('DB_PORT', '3306');
 
-// ==================== DATABASE CONNECTION ====================
 try {
-    $conn = new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME, DB_PORT);
-    
-    if ($conn->connect_error) {
-        throw new Exception("Database connection failed: " . $conn->connect_error);
-    }
-    
-    // Set charset to UTF-8
-    $conn->set_charset("utf8mb4");
-    
-} catch (Exception $e) {
-    error_log($e->getMessage());
-    die("System maintenance in progress. Please try again later.");
+    $pdo = new PDO(
+        "mysql:host=".DB_HOST.";dbname=".DB_NAME.";port=".DB_PORT.";charset=utf8mb4",
+        DB_USER,
+        DB_PASS,
+        [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            PDO::ATTR_EMULATE_PREPARES => false
+        ]
+    );
+} catch (PDOException $e) {
+    error_log("DB Connection Failed: " . $e->getMessage());
+    die("System temporarily unavailable. Staff notified.");
 }
 
-// ==================== SECURITY FUNCTIONS ====================
-/**
- * Sanitize input data
- */
-function sanitize($data) {
-    global $conn;
-    return htmlspecialchars(strip_tags(trim($conn->real_escape_string($data))));
+// ==================== ESSENTIAL FUNCTIONS ====================
+function cleanInput($data) {
+    return htmlspecialchars(strip_tags(trim($data)));
 }
 
-/**
- * Password hashing (using PHP password_hash)
- */
 function hashPassword($password) {
     return password_hash($password, PASSWORD_BCRYPT, ['cost' => 12]);
 }
 
-/**
- * Verify password against hash
- */
-function verifyPassword($password, $hash) {
-    return password_verify($password, $hash);
+function verifyPassword($input, $hash) {
+    return password_verify($input, $hash);
 }
 
-/**
- * Redirect with optional status code
- */
-function redirect($url, $statusCode = 303) {
-    header('Location: ' . $url, true, $statusCode);
+function redirect($url, $delay = 0) {
+    if ($delay > 0) {
+        header("Refresh: $delay; url=$url");
+    } else {
+        header("Location: $url");
+    }
     exit();
 }
+//sanitize data function
+// In config.php - Replace the sanitize function with this:
+function sanitize($data) {
+    if (!is_string($data)) return $data;
+    return htmlspecialchars(trim($data), ENT_QUOTES, 'UTF-8');
+}
 
-/**
- * CSRF token generation/validation
- */
-function generateCsrfToken() {
+// ==================== AUTH HELPERS ====================
+function isLoggedIn() {
+    return isset($_SESSION['user']);
+}
+
+function requireAuth() {
+    if (!isLoggedIn()) {
+        $_SESSION['redirect'] = $_SERVER['REQUEST_URI'];
+        redirect('/auth/login.php');
+    }
+}
+
+function requireAdmin() {
+    requireAuth();
+    if ($_SESSION['user']['role'] !== 'admin') {
+        $_SESSION['error'] = "Administrator privileges required";
+        redirect('/dashboard.php');
+    }
+}
+
+// ==================== CSRF PROTECTION ====================
+function generateToken() {
     if (empty($_SESSION['csrf_token'])) {
         $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
     }
     return $_SESSION['csrf_token'];
 }
 
-function validateCsrfToken($token) {
-    return isset($_SESSION['csrf_token']) && hash_equals($_SESSION['csrf_token'], $token);
+function validateToken($token) {
+    return hash_equals($_SESSION['csrf_token'] ?? '', $token);
 }
 
-// ==================== UTILITY FUNCTIONS ====================
-/**
- * Formats Ugandan phone numbers to a standard +256 XXX XXX XXX format
- * @param string $phone The raw phone number
- * @return string Formatted phone number
- */
-function formatUgandanPhone($phone) {
-    if (empty($phone)) {
-        return 'N/A';
+// ==================== UTILITIES ====================
+function formatPhoneUG($phone) {
+    $cleaned = preg_replace('/[^0-9]/', '', $phone);
+    if (preg_match('/^(0|256|\+256)?(7\d{8})$/', $cleaned, $matches)) {
+        return '+256 ' . chunk_split($matches[2], 3, ' ');
     }
-
-    // Remove all non-digit characters
-    $phone = preg_replace('/[^0-9]/', '', $phone);
-    
-    // Handle different number formats
-    if (strlen($phone) === 9 && substr($phone, 0, 1) !== '0') {
-        // Already in 771234567 format
-        return '+256 ' . chunk_split($phone, 3, ' ');
-    }
-    elseif (strlen($phone) === 10 && substr($phone, 0, 1) === '0') {
-        // 0771234567 format
-        return '+256 ' . chunk_split(substr($phone, 1), 3, ' ');
-    }
-    elseif (strlen($phone) === 12 && substr($phone, 0, 3) === '256') {
-        // 256771234567 format
-        return '+256 ' . chunk_split(substr($phone, 3), 3, ' ');
-    }
-    elseif (strlen($phone) === 13 && substr($phone, 0, 4) === '+256') {
-        // +256771234567 format
-        return '+256 ' . chunk_split(substr($phone, 4), 3, ' ');
-    }
-    
-    // Return original if not a standard Ugandan number
-    return $phone;
+    return $phone; // Return original if invalid
 }
 
-/**
- * Validates Ugandan phone numbers
- */
-function isValidUgandanPhone($phone) {
-    $phone = preg_replace('/[^0-9]/', '', $phone);
-    return preg_match('/^(0|256|\+256)?(7|3)\d{8}$/', $phone);
-}
-
-// ==================== APPLICATION SETTINGS ====================
-define('APP_NAME', 'Rukindo Kweyamba Savings Management System');
-define('BASE_URL', 'http://' . $_SERVER['HTTP_HOST'] . '/savingssystem/');
+// ==================== APP CONSTANTS ====================
+define('APP_NAME', 'Rukindo Kweyamba SACCO');
+define('BASE_URL', 'https://' . $_SERVER['HTTP_HOST'] . '/');
 define('MAX_LOGIN_ATTEMPTS', 5);
-define('PASSWORD_RESET_TIMEOUT', 3600); // 1 hour
+define('LOCKOUT_TIME', 15 * 60); // 15 minutes
 
-// ==================== AUTOLOAD CLASSES ====================
-spl_autoload_register(function ($class_name) {
-    $file = __DIR__ . '/classes/' . $class_name . '.php';
-    if (file_exists($file)) {
-        require_once $file;
-    }
-});
-
-// ==================== TIMEZONE SETTING ====================
-date_default_timezone_set('Africa/Nairobi');
-
-// ==================== ERROR HANDLER ====================
-set_error_handler(function($errno, $errstr, $errfile, $errline) {
-    error_log("Error [$errno] in $errfile on line $errline: $errstr");
-    if (defined('ENVIRONMENT') && ENVIRONMENT === 'development') {
-        echo "<div class='alert alert-danger'>System Error: $errstr</div>";
-    }
-});
-
-// ==================== SHUTDOWN FUNCTION ====================
+// ==================== AUTO-CLOSE CONNECTION ====================
 register_shutdown_function(function() {
-    global $conn;
-    if (isset($conn) && $conn instanceof mysqli) {
-        $conn->close();
-    }
+    global $pdo;
+    $pdo = null; // Proper PDO connection closure
 });
-
-// ==================== AUTHENTICATION HELPERS ====================
-function is_logged_in() {
-    return isset($_SESSION['user']);
-}
-
-function require_auth() {
-    if (!is_logged_in()) {
-        redirect('auth/login.php');
-    }
-}
-
-function require_admin() {
-    require_auth();
-    if ($_SESSION['user']['role'] !== 'admin') {
-        $_SESSION['error'] = "Admin access required";
-        redirect('index.php');
-    }
-}

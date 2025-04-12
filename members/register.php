@@ -30,10 +30,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['district'])) {
 
 // Process Ugandan member registration
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // Start transaction for data integrity
-    $conn->begin_transaction();
-    
     try {
+        // Start transaction for data integrity
+        $pdo->beginTransaction();
+        
         // Sanitize all inputs
         $full_name = sanitize($_POST['full_name'] ?? '');
         $nin_number = sanitize($_POST['ninnumber'] ?? '');
@@ -85,44 +85,53 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         // Prepare and execute the insert statement
-        $stmt = $conn->prepare("INSERT INTO memberz (
+        $stmt = $pdo->prepare("INSERT INTO memberz (
             member_no, full_name, nin_number, phone, email, 
             district, subcounty, village, gender, dob, occupation, 
             next_of_kin_name, next_of_kin_contact
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        ) VALUES (
+            :member_no, :full_name, :nin_number, :phone, :email, 
+            :district, :subcounty, :village, :gender, :dob, :occupation, 
+            :next_of_kin_name, :next_of_kin_contact
+        )");
         
-        if (!$stmt) {
-            throw new Exception("Database error: " . $conn->error);
-        }
+        $params = [
+            ':member_no' => $member_no,
+            ':full_name' => $full_name,
+            ':nin_number' => $nin_number,
+            ':phone' => $phone,
+            ':email' => $email,
+            ':district' => $district,
+            ':subcounty' => $subcounty,
+            ':village' => $village,
+            ':gender' => $gender,
+            ':dob' => $dob,
+            ':occupation' => $occupation,
+            ':next_of_kin_name' => $next_of_kin_name,
+            ':next_of_kin_contact' => $next_of_kin_contact
+        ];
         
-        $stmt->bind_param("sssssssssssss", 
-            $member_no,
-            $full_name,
-            $nin_number,
-            $phone,
-            $email,
-            $district,
-            $subcounty,
-            $village,
-            $gender,
-            $dob,
-            $occupation,
-            $next_of_kin_name,
-            $next_of_kin_contact
-        );
+        $stmt->execute($params);
         
-        if (!$stmt->execute()) {
-            if ($conn->errno == 1062 && strpos($conn->error, 'nin_number') !== false) {
-                throw new Exception("This NIN number is already registered");
-            }
-            if ($conn->errno == 1062 && strpos($conn->error, 'phone') !== false) {
-                throw new Exception("This phone number is already registered");
+        // Check for duplicate entries
+        if ($stmt->rowCount() === 0) {
+            $errorInfo = $stmt->errorInfo();
+            if (isset($errorInfo[1])) {
+                // Check for duplicate NIN or phone
+                if ($errorInfo[1] == 1062) {
+                    if (strpos($errorInfo[2], 'nin_number') !== false) {
+                        throw new Exception("This NIN number is already registered");
+                    }
+                    if (strpos($errorInfo[2], 'phone') !== false) {
+                        throw new Exception("This phone number is already registered");
+                    }
+                }
             }
             throw new Exception("Registration failed. Please try again.");
         }
         
         // Commit transaction
-        $conn->commit();
+        $pdo->commit();
         
         // Set success session variables
         $_SESSION['success'] = true;
@@ -132,8 +141,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Redirect back to show success message
         redirect('register.php');
         
+    } catch (PDOException $e) {
+        $pdo->rollBack();
+        error_log("Database error: " . $e->getMessage());
+        $error = "A database error occurred. Please try again.";
     } catch (Exception $e) {
-        $conn->rollback();
+        if (isset($pdo) && $pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
         $error = $e->getMessage();
     }
 }
@@ -192,7 +207,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
 
                 <?php if (isset($error)): ?>
-                    <div class="alert alert-danger"><?= $error ?></div>
+                    <div class="alert alert-danger"><?= htmlspecialchars($error) ?></div>
                 <?php endif; ?>
 
                 <div class="card shadow">
@@ -273,9 +288,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                         onchange="generateMemberNumber()">
                                         <option value="">Select District</option>
                                         <?php foreach ($uganda_districts as $district): ?>
-                                            <option value="<?= $district ?>" 
+                                            <option value="<?= htmlspecialchars($district) ?>" 
                                                 <?= ($_POST['district'] ?? '') === $district ? 'selected' : '' ?>>
-                                                <?= $district ?>
+                                                <?= htmlspecialchars($district) ?>
                                             </option>
                                         <?php endforeach; ?>
                                     </select>

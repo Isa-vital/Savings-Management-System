@@ -1,51 +1,33 @@
 <?php
-require_once '../config.php';
+require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../helpers/auth.php';
 
-// Authentication check
-if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'admin') {
-    $_SESSION['error'] = "Unauthorized access";
-    redirect('../index.php');
-}
+// Authentication check - only allow logged in users
+require_login();
 
 // Check if member ID is provided
 if (!isset($_GET['member_id'])) {
     $_SESSION['error'] = "Member ID not specified";
-    redirect('memberslist.php');
+    header('Location: memberslist.php');
+    exit();
 }
 
 $member_id = intval($_GET['member_id']);
 
 try {
-    // Fetch member details using PDO
+    // Fetch member details
     $stmt = $pdo->prepare("SELECT id, member_no, full_name FROM memberz WHERE id = :member_id");
     $stmt->execute([':member_id' => $member_id]);
     $member = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$member) {
         $_SESSION['error'] = "Member not found";
-        redirect('memberslist.php');
+        header('Location: memberslist.php');
+        exit();
     }
 
-    // Handle savings record deletion
-    if (isset($_GET['delete_saving'])) {
-        $saving_id = intval($_GET['delete_saving']);
-        
-        $pdo->beginTransaction();
-        try {
-            $stmt = $pdo->prepare("DELETE FROM savings WHERE id = :saving_id");
-            $stmt->execute([':saving_id' => $saving_id]);
-            
-            $pdo->commit();
-            $_SESSION['success'] = "Savings record deleted successfully";
-        } catch (PDOException $e) {
-            $pdo->rollBack();
-            $_SESSION['error'] = "Error deleting savings record: " . $e->getMessage();
-        }
-        redirect('savings.php?member_id=' . $member_id);
-    }
-
-    // Process new savings record
-    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_saving'])) {
+    // Process deposit form submission
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_deposit'])) {
         $pdo->beginTransaction();
         
         try {
@@ -53,6 +35,7 @@ try {
             $date = sanitize($_POST['date'] ?? '');
             $receipt_no = sanitize($_POST['receipt_no'] ?? '');
             $notes = sanitize($_POST['notes'] ?? '');
+            $deposit_type = sanitize($_POST['deposit_type'] ?? 'regular');
 
             // Validate required fields
             if ($amount <= 0) {
@@ -63,22 +46,25 @@ try {
                 throw new Exception("Date is required");
             }
 
-            // Insert new savings record using PDO
+            // Insert new deposit record
             $stmt = $pdo->prepare("INSERT INTO savings 
-                (member_id, amount, date, receipt_no, notes) 
-                VALUES (:member_id, :amount, :date, :receipt_no, :notes)");
+                (member_id, amount, date, receipt_no, notes, deposit_type, recorded_by) 
+                VALUES (:member_id, :amount, :date, :receipt_no, :notes, :deposit_type, :recorded_by)");
             
             $stmt->execute([
                 ':member_id' => $member_id,
                 ':amount' => $amount,
                 ':date' => $date,
                 ':receipt_no' => $receipt_no,
-                ':notes' => $notes
+                ':notes' => $notes,
+                ':deposit_type' => $deposit_type,
+                ':recorded_by' => $_SESSION['user']['id']
             ]);
             
             $pdo->commit();
-            $_SESSION['success'] = "Savings record added successfully";
-            redirect('savings.php?member_id=' . $member_id);
+            $_SESSION['success'] = "Deposit recorded successfully";
+            header("Location: deposit.php?member_id=$member_id");
+            exit();
             
         } catch (PDOException $e) {
             $pdo->rollBack();
@@ -89,7 +75,7 @@ try {
         }
     }
 
-    // Fetch savings history using PDO
+    // Fetch savings history
     $stmt = $pdo->prepare("SELECT * FROM savings WHERE member_id = :member_id ORDER BY date DESC");
     $stmt->execute([':member_id' => $member_id]);
     $savings = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -98,9 +84,10 @@ try {
     $total_savings = array_sum(array_column($savings, 'amount'));
 
 } catch (PDOException $e) {
-    error_log("Database error in savings.php: " . $e->getMessage());
+    error_log("Database error in deposit.php: " . $e->getMessage());
     $_SESSION['error'] = "A database error occurred. Please try again.";
-    redirect('memberslist.php');
+    header('Location: memberslist.php');
+    exit();
 }
 ?>
 
@@ -109,44 +96,37 @@ try {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Manage Savings - Ugandan SACCO</title>
+    <title>Record Deposit - <?= htmlspecialchars($member['full_name']) ?></title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        .uganda-flag {
-            background: linear-gradient(to right, 
-                #000 0%, #000 33%, 
-                #FFC90D 33%, #FFC90D 66%, 
-                #DE2010 66%, #DE2010 100%);
-            height: 5px;
-            margin-bottom: 20px;
+        .member-info-card {
+            border-left: 5px solid #28a745;
+        }
+        .savings-table th {
+            background-color: #f8f9fa;
         }
         .total-savings {
             font-size: 1.2rem;
             font-weight: bold;
         }
-        .member-info-card {
-            border-left: 5px solid #28a745;
-        }
     </style>
 </head>
 <body>
-    <?php include '../partials/navbar.php'; ?>
+    <?php include __DIR__ . '/../partials/navbar.php'; ?>
     
     <div class="container-fluid">
         <div class="row">
-            <?php include '../partials/sidebar.php'; ?>
+            <?php include __DIR__ . '/../partials/sidebar.php'; ?>
             
             <main class="col-md-9 ms-sm-auto px-md-4 py-4">
-                <div class="uganda-flag"></div>
-                
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                     <h1 class="h2">
-                        <i class="fas fa-wallet me-2"></i>Manage Savings
+                        <i class="fas fa-money-bill-wave me-2"></i>Record Deposit
                     </h1>
                     <div class="btn-toolbar mb-2 mb-md-0">
-                        <a href="view.php?id=<?= htmlspecialchars($member['id']) ?>" class="btn btn-secondary">
-                            <i class="fas fa-arrow-left me-1"></i> Back to Member
+                        <a href="memberslist.php" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left me-1"></i> Back to Members
                         </a>
                     </div>
                 </div>
@@ -185,37 +165,47 @@ try {
                 <div class="row">
                     <div class="col-md-5 mb-4">
                         <div class="card shadow">
-                            <div class="card-header">
+                            <div class="card-header bg-primary text-white">
                                 <h5 class="mb-0">
-                                    <i class="fas fa-plus-circle me-2"></i>Add New Savings
+                                    <i class="fas fa-plus-circle me-2"></i>New Deposit
                                 </h5>
                             </div>
                             <div class="card-body">
                                 <form method="POST">
                                     <div class="mb-3">
-                                        <label class="form-label required-field">Amount (UGX)</label>
+                                        <label class="form-label fw-bold">Amount (UGX)</label>
                                         <input type="number" class="form-control" name="amount" 
                                             min="1000" step="100" required>
                                     </div>
                                     
                                     <div class="mb-3">
-                                        <label class="form-label required-field">Date</label>
+                                        <label class="form-label fw-bold">Date</label>
                                         <input type="date" class="form-control" name="date" 
                                             max="<?= htmlspecialchars(date('Y-m-d')) ?>" required>
                                     </div>
                                     
                                     <div class="mb-3">
-                                        <label class="form-label">Receipt Number</label>
-                                        <input type="text" class="form-control" name="receipt_no">
+                                        <label class="form-label fw-bold">Receipt Number</label>
+                                        <input type="text" class="form-control" name="receipt_no" required>
                                     </div>
                                     
                                     <div class="mb-3">
-                                        <label class="form-label">Notes</label>
+                                        <label class="form-label fw-bold">Deposit Type</label>
+                                        <select class="form-select" name="deposit_type" required>
+                                            <option value="regular">Regular Savings</option>
+                                            <option value="special">Special Deposit</option>
+                                            <option value="registration">Registration Fee</option>
+                                            <option value="other">Other</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label class="form-label fw-bold">Notes</label>
                                         <textarea class="form-control" name="notes" rows="2"></textarea>
                                     </div>
                                     
-                                    <button type="submit" name="add_saving" class="btn btn-success w-100">
-                                        <i class="fas fa-save me-1"></i> Add Savings
+                                    <button type="submit" name="add_deposit" class="btn btn-success w-100 py-2 fw-bold">
+                                        <i class="fas fa-save me-1"></i> Record Deposit
                                     </button>
                                 </form>
                             </div>
@@ -224,37 +214,34 @@ try {
                     
                     <div class="col-md-7">
                         <div class="card shadow">
-                            <div class="card-header">
+                            <div class="card-header bg-primary text-white">
                                 <h5 class="mb-0">
-                                    <i class="fas fa-history me-2"></i>Savings History
+                                    <i class="fas fa-history me-2"></i>Deposit History
                                 </h5>
                             </div>
                             <div class="card-body">
                                 <?php if (empty($savings)): ?>
-                                    <p class="text-muted">No savings records found</p>
+                                    <div class="alert alert-info">No deposit records found</div>
                                 <?php else: ?>
                                     <div class="table-responsive">
-                                        <table class="table table-striped">
+                                        <table class="table savings-table">
                                             <thead>
                                                 <tr>
                                                     <th>Date</th>
                                                     <th>Amount</th>
                                                     <th>Receipt No</th>
-                                                    <th>Actions</th>
+                                                    <th>Type</th>
+                                                    <th>Recorded By</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                <?php foreach ($savings as $saving): ?>
+                                                <?php foreach ($savings as $deposit): ?>
                                                     <tr>
-                                                        <td><?= htmlspecialchars(date('d M Y', strtotime($saving['date']))) ?></td>
-                                                        <td>UGX <?= htmlspecialchars(number_format($saving['amount'], 2)) ?></td>
-                                                        <td><?= htmlspecialchars($saving['receipt_no'] ?: 'N/A') ?></td>
-                                                        <td>
-                                                            <button onclick="confirmDelete(<?= htmlspecialchars($saving['id']) ?>)" 
-                                                                    class="btn btn-sm btn-danger">
-                                                                <i class="fas fa-trash-alt"></i>
-                                                            </button>
-                                                        </td>
+                                                        <td><?= htmlspecialchars(date('d M Y', strtotime($deposit['date']))) ?></td>
+                                                        <td class="fw-bold">UGX <?= htmlspecialchars(number_format($deposit['amount'], 2)) ?></td>
+                                                        <td><?= htmlspecialchars($deposit['receipt_no']) ?></td>
+                                                        <td><?= htmlspecialchars(ucfirst($deposit['deposit_type'])) ?></td>
+                                                        <td><?= htmlspecialchars(getUserNameById($pdo, $deposit['recorded_by'])) ?></td>
                                                     </tr>
                                                 <?php endforeach; ?>
                                             </tbody>
@@ -269,38 +256,15 @@ try {
         </div>
     </div>
 
-    <!-- Delete Confirmation Modal -->
-    <div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header bg-danger text-white">
-                    <h5 class="modal-title">Confirm Deletion</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <p>Are you sure you want to delete this savings record?</p>
-                    <p class="fw-bold">This action cannot be undone!</p>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <a href="#" id="deleteBtn" class="btn btn-danger">Delete Record</a>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Delete confirmation
-        function confirmDelete(savingId) {
-            const deleteBtn = document.getElementById('deleteBtn');
-            deleteBtn.href = `savings.php?member_id=<?= htmlspecialchars($member_id) ?>&delete_saving=${savingId}`;
-            const modal = new bootstrap.Modal(document.getElementById('deleteModal'));
-            modal.show();
-        }
-        
         // Set default date to today
         document.querySelector('input[name="date"]').valueAsDate = new Date();
+        
+        // Format amount field on input
+        document.querySelector('input[name="amount"]').addEventListener('input', function(e) {
+            this.value = this.value.replace(/[^0-9]/g, '');
+        });
     </script>
 </body>
 </html>

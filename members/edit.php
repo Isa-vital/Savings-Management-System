@@ -1,31 +1,37 @@
 <?php
-require_once '../config.php';
+require_once __DIR__ . '/../config.php';
 
 // Authentication check
 if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'admin') {
     $_SESSION['error'] = "Unauthorized access";
-    redirect('../index.php');
+    header('Location: ../index.php');
+    exit;
 }
 
 // Check if member ID is provided
 if (!isset($_GET['member_no'])) {
     $_SESSION['error'] = "Member ID not specified";
-    redirect('memberslist.php');
+    header('Location: memberslist.php');
+    exit;
 }
 
-$member_no = intval($_GET['member_no']);
-
+$member_no = sanitize($_GET['member_no']);
 
 // Fetch member details
-$stmt = $conn->prepare("SELECT * FROM memberz WHERE member_no = ?");
-$stmt->bind_param("s", $_GET['member_no']);
-$stmt->execute();
-$result = $stmt->get_result();
-$member = $result->fetch_assoc();
+try {
+    $stmt = $pdo->prepare("SELECT * FROM memberz WHERE member_no = ?");
+    $stmt->execute([$member_no]);
+    $member = $stmt->fetch(PDO::FETCH_ASSOC);
 
-if (!$member) {
-    $_SESSION['error'] = "Member not found";
-    redirect('memberslist.php');
+    if (!$member) {
+        $_SESSION['error'] = "Member not found";
+        header('Location: memberslist.php');
+        exit;
+    }
+} catch (PDOException $e) {
+    $_SESSION['error'] = "Database error: " . $e->getMessage();
+    header('Location: memberslist.php');
+    exit;
 }
 
 // Ugandan districts array
@@ -36,9 +42,9 @@ $uganda_districts = [
 
 // Process form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $conn->begin_transaction();
-    
     try {
+        $pdo->beginTransaction();
+        
         // Sanitize all inputs
         $full_name = sanitize($_POST['full_name'] ?? '');
         $nin_number = sanitize($_POST['ninnumber'] ?? '');
@@ -88,13 +94,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         // Update member record
-        $stmt = $conn->prepare("UPDATE memberz SET 
+        $stmt = $pdo->prepare("UPDATE memberz SET 
             full_name = ?, nin_number = ?, phone = ?, email = ?,
             district = ?, subcounty = ?, village = ?, gender = ?,
             dob = ?, occupation = ?, next_of_kin_name = ?, next_of_kin_contact = ?
-            WHERE id = ?");
+            WHERE member_no = ?");
         
-        $stmt->bind_param("ssssssssssssi", 
+        $stmt->execute([
             $full_name,
             $nin_number,
             $phone,
@@ -108,26 +114,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $next_of_kin_name,
             $next_of_kin_contact,
             $member_no
-        );
+        ]);
         
-        if (!$stmt->execute()) {
-            // Check for duplicate NIN
-            if ($conn->errno == 1062 && strpos($conn->error, 'nin_number') !== false) {
-                throw new Exception("This NIN number is already registered");
-            }
-            // Check for duplicate phone
-            if ($conn->errno == 1062 && strpos($conn->error, 'phone') !== false) {
-                throw new Exception("This phone number is already registered");
-            }
-            throw new Exception("Update failed. Please try again.");
-        }
-        
-        $conn->commit();
+        $pdo->commit();
         $_SESSION['success'] = "Member updated successfully";
-        redirect('view.php?id=' . $member_no);
+        header('Location: view.php?member_no=' . $member_no);
+        exit;
         
+    } catch (PDOException $e) {
+        $pdo->rollBack();
+        if ($e->errorInfo[1] == 1062) {
+            if (strpos($e->getMessage(), 'nin_number') !== false) {
+                $error = "This NIN number is already registered";
+            } elseif (strpos($e->getMessage(), 'phone') !== false) {
+                $error = "This phone number is already registered";
+            } else {
+                $error = "Update failed. Please try again.";
+            }
+        } else {
+            $error = "Database error: " . $e->getMessage();
+        }
     } catch (Exception $e) {
-        $conn->rollback();
+        $pdo->rollBack();
         $error = $e->getMessage();
     }
 }
@@ -171,14 +179,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <i class="fas fa-user-edit me-2"></i>Edit Member
                     </h1>
                     <div class="btn-toolbar mb-2 mb-md-0">
-                        <a href="view.php?id=<?= $member['member_no'] ?>" class="btn btn-secondary">
+                        <a href="view.php?member_no=<?= htmlspecialchars($member['member_no']) ?>" class="btn btn-secondary">
                             <i class="fas fa-times me-1"></i> Cancel
                         </a>
                     </div>
                 </div>
 
                 <?php if (isset($error)): ?>
-                    <div class="alert alert-danger"><?= $error ?></div>
+                    <div class="alert alert-danger"><?= htmlspecialchars($error) ?></div>
                 <?php endif; ?>
 
                 <div class="card shadow">
@@ -259,9 +267,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                     <select class="form-select" name="district" required>
                                         <option value="">Select District</option>
                                         <?php foreach ($uganda_districts as $district): ?>
-                                            <option value="<?= $district ?>" 
+                                            <option value="<?= htmlspecialchars($district) ?>" 
                                                 <?= $member['district'] === $district ? 'selected' : '' ?>>
-                                                <?= $district ?>
+                                                <?= htmlspecialchars($district) ?>
                                             </option>
                                         <?php endforeach; ?>
                                     </select>
@@ -302,7 +310,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             </div>
 
                             <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
-                                <a href="view.php?id=<?= $member['member_no'] ?>" class="btn btn-secondary me-md-2">
+                                <a href="view.php?member_no=<?= htmlspecialchars($member['member_no']) ?>" class="btn btn-secondary me-md-2">
                                     <i class="fas fa-times me-1"></i> Cancel
                                 </a>
                                 <button type="submit" class="btn btn-primary">
@@ -333,5 +341,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             this.value = this.value.replace(/[^0-9]/g, '');
         });
     </script>
+
+    <!---update successfull popup modal-->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Show Bootstrap toast notification
+    const successToast = new bootstrap.Toast(document.getElementById('successToast'));
+    
+    <?php if (isset($_SESSION['success'])): ?>
+        successToast.show();
+        <?php unset($_SESSION['success']); ?>
+    <?php endif; ?>
+});
+</script>
+
+<!-- Add this toast HTML anywhere in your layout -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index: 11">
+    <div id="successToast" class="toast hide" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="toast-header bg-success text-white">
+            <strong class="me-auto">Success</strong>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+        <div class="toast-body">
+            Member record updated successfully!
+        </div>
+    </div>
+</div>
 </body>
 </html>

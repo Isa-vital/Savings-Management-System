@@ -4,51 +4,60 @@
  * 
  * Displays overview statistics and recent transactions
  */
-require_once 'config.php';
+require_once __DIR__ . '/config.php';
 
 // Redirect if not logged in
 if (!isset($_SESSION['user'])) {
-    redirect('auth/login.php');
+    header('Location: auth/login.php');
+    exit;
 }
 
 // Check user role for authorization
 if ($_SESSION['user']['role'] !== 'admin') {
     $_SESSION['error'] = "Unauthorized access";
-    redirect('members/list.php');
+    header('Location: members/list.php');
+    exit;
 }
 
-// ==================== DASHBOARD STATISTICS ====================
+// Initialize stats array
 $stats = [];
+$transactions = [];
 
-// Total Members
-$result = $conn->query("SELECT COUNT(*) as total FROM memberz");
-$stats['total_members'] = $result->fetch_assoc()['total'];
+try {
+    // ==================== DASHBOARD STATISTICS ====================
+    // Total Members
+    $stmt = $pdo->query("SELECT COUNT(*) as total FROM memberz");
+    $stats['total_members'] = $stmt->fetchColumn();
 
-// Total Savings
-$result = $conn->query("SELECT SUM(amount) as total FROM savings");
-$stats['total_savings'] = $result->fetch_assoc()['total'] ?? 0;
+    // Total Savings
+    $stmt = $pdo->query("SELECT COALESCE(SUM(amount), 0) as total FROM savings");
+    $stats['total_savings'] = $stmt->fetchColumn();
 
-// Active Loans
-$result = $conn->query("SELECT COUNT(*) as total FROM loans WHERE status = 'active'");
-$stats['active_loans'] = $result->fetch_assoc()['total'];
+    // Active Loans
+    $stmt = $pdo->query("SELECT COUNT(*) as total FROM loans WHERE status = 'active'");
+    $stats['active_loans'] = $stmt->fetchColumn();
 
-// Recent Transactions (last 7 days)
-$transactions = $conn->query("
-    SELECT t.id, m.full_name, t.amount, t.transaction_date, t.transaction_type 
-    FROM transactions t
-    JOIN memberz m ON t.member_id = m.member_no
-    ORDER BY t.transaction_date DESC 
-    LIMIT 10
-");
+    // Recent Transactions (last 7 days)
+    $stmt = $pdo->query("
+        SELECT t.id, m.full_name, t.amount, t.transaction_date, t.transaction_type 
+        FROM transactions t
+        JOIN memberz m ON t.member_id = m.member_no
+        ORDER BY t.transaction_date DESC 
+        LIMIT 10
+    ");
+    $transactions = $stmt->fetchAll();
 
-// ==================== HTML DASHBOARD ====================
+} catch (PDOException $e) {
+    error_log("Database error: " . $e->getMessage());
+    $_SESSION['error'] = "System error occurred. Please try again later.";
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?= APP_NAME ?> - Dashboard</title>
+    <title><?= htmlspecialchars(APP_NAME) ?> - Dashboard</title>
     
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -104,7 +113,7 @@ $transactions = $conn->query("
                                 <div class="row align-items-center">
                                     <div class="col">
                                         <h5 class="text-uppercase text-muted mb-0">Total Members</h5>
-                                        <h2 class="mb-0"><?= number_format($stats['total_members']) ?></h2>
+                                        <h2 class="mb-0"><?= number_format($stats['total_members'] ?? 0) ?></h2>
                                     </div>
                                     <div class="col-auto">
                                         <i class="fas fa-users fa-2x text-gray-300"></i>
@@ -112,7 +121,7 @@ $transactions = $conn->query("
                                 </div>
                             </div>
                             <div class="card-footer bg-light">
-                                <a href="memberslist.php" class="text-decoration-none">
+                                <a href="members/list.php" class="text-decoration-none">
                                     View all members <i class="fas fa-arrow-right ms-1"></i>
                                 </a>
                             </div>
@@ -125,7 +134,7 @@ $transactions = $conn->query("
                                 <div class="row align-items-center">
                                     <div class="col">
                                         <h5 class="text-uppercase text-muted mb-0">Total Savings</h5>
-                                        <h2 class="mb-0">UGX <?= number_format($stats['total_savings'], 2) ?></h2>
+                                        <h2 class="mb-0">UGX <?= number_format($stats['total_savings'] ?? 0, 2) ?></h2>
                                     </div>
                                     <div class="col-auto">
                                         <i class="fas fa-piggy-bank fa-2x text-gray-300"></i>
@@ -146,7 +155,7 @@ $transactions = $conn->query("
                                 <div class="row align-items-center">
                                     <div class="col">
                                         <h5 class="text-uppercase text-muted mb-0">Active Loans</h5>
-                                        <h2 class="mb-0"><?= number_format($stats['active_loans']) ?></h2>
+                                        <h2 class="mb-0"><?= number_format($stats['active_loans'] ?? 0) ?></h2>
                                     </div>
                                     <div class="col-auto">
                                         <i class="fas fa-hand-holding-usd fa-2x text-gray-300"></i>
@@ -154,7 +163,7 @@ $transactions = $conn->query("
                                 </div>
                             </div>
                             <div class="card-footer bg-light">
-                                <a href="loans/loanslist.php" class="text-decoration-none">
+                                <a href="loans/list.php" class="text-decoration-none">
                                     Manage loans <i class="fas fa-arrow-right ms-1"></i>
                                 </a>
                             </div>
@@ -187,21 +196,21 @@ $transactions = $conn->query("
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <?php while ($transaction = $transactions->fetch_assoc()): ?>
+                                    <?php foreach ($transactions as $transaction): ?>
                                     <tr>
-                                        <td><?= $transaction['id'] ?></td>
-                                        <td><?= htmlspecialchars($transaction['name']) ?></td>
+                                        <td><?= htmlspecialchars($transaction['id']) ?></td>
+                                        <td><?= htmlspecialchars($transaction['full_name']) ?></td>
                                         <td class="<?= $transaction['transaction_type'] === 'deposit' ? 'text-success' : 'text-danger' ?>">
                                             UGX <?= number_format($transaction['amount'], 2) ?>
                                         </td>
                                         <td>
                                             <span class="badge bg-<?= $transaction['transaction_type'] === 'deposit' ? 'success' : 'warning' ?>">
-                                                <?= ucfirst($transaction['transaction_type']) ?>
+                                                <?= ucfirst(htmlspecialchars($transaction['transaction_type'])) ?>
                                             </span>
                                         </td>
                                         <td><?= date('M j, Y g:i a', strtotime($transaction['transaction_date'])) ?></td>
                                     </tr>
-                                    <?php endwhile; ?>
+                                    <?php endforeach; ?>
                                 </tbody>
                             </table>
                         </div>
@@ -216,7 +225,7 @@ $transactions = $conn->query("
                         </a>
                     </div>
                     <div class="col-md-4 mb-3">
-                        <a href="savings/savings.php" class="btn btn-success w-100 py-3">
+                        <a href="savings/deposit.php" class="btn btn-success w-100 py-3">
                             <i class="fas fa-money-bill-wave me-2"></i>Record Savings
                         </a>
                     </div>
@@ -233,38 +242,13 @@ $transactions = $conn->query("
     <!-- Bootstrap JS Bundle with Popper -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     
-    <!-- Chart.js for future analytics -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    
-    <!-- Custom Dashboard Scripts -->
+    <!-- Custom Scripts -->
     <script>
-        // Simple chart example (can be expanded)
-        document.addEventListener('DOMContentLoaded', function() {
-            const ctx = document.getElementById('savingsChart');
-            if (ctx) {
-                new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-                        datasets: [{
-                            label: 'Total Savings',
-                            data: [12000, 19000, 3000, 5000, 2000, 30000],
-                            borderColor: '#1cc88a',
-                            backgroundColor: 'rgba(28, 200, 138, 0.1)',
-                            tension: 0.1
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        plugins: {
-                            legend: {
-                                position: 'top',
-                            }
-                        }
-                    }
-                });
-            }
-        });
+        // Simple error display from session
+        <?php if (isset($_SESSION['error'])): ?>
+            alert('<?= addslashes($_SESSION['error']) ?>');
+            <?php unset($_SESSION['error']); ?>
+        <?php endif; ?>
     </script>
 </body>
 </html>

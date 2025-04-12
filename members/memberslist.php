@@ -1,78 +1,71 @@
 <?php
-require_once '../config.php';
+require_once __DIR__ . '/../config.php';
 
 // Authentication check
 if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'admin') {
     $_SESSION['error'] = "Unauthorized access";
-    redirect('../index.php');
+    header('Location: ../index.php');
+    exit;
 }
 
 // Handle member deletion
 if (isset($_GET['delete'])) {
     $member_no = sanitize($_GET['delete']);
     
-    $conn->begin_transaction();
     try {
-        // First delete from savings table (foreign key constraint)
-        $stmt = $conn->prepare("DELETE FROM savings WHERE member_id = ?");
-        $stmt->bind_param("s", $member_no);
-        if (!$stmt->execute()) {
-            throw new Exception("Failed to delete savings records");
-        }
+        $pdo->beginTransaction();
+        
+        // First delete from savings table
+        $stmt = $pdo->prepare("DELETE FROM savings WHERE member_id = ?");
+        $stmt->execute([$member_no]);
         
         // Then delete from members table
-        $stmt = $conn->prepare("DELETE FROM memberz WHERE member_no = ?");
-        $stmt->bind_param("s", $member_no);
-        if (!$stmt->execute()) {
-            throw new Exception("Failed to delete member");
-        }
+        $stmt = $pdo->prepare("DELETE FROM memberz WHERE member_no = ?");
+        $stmt->execute([$member_no]);
         
-        $conn->commit();
+        $pdo->commit();
         $_SESSION['success'] = "Member deleted successfully";
-    } catch (Exception $e) {
-        $conn->rollback();
+    } catch (PDOException $e) {
+        $pdo->rollBack();
         $_SESSION['error'] = "Error deleting member: " . $e->getMessage();
     }
-    redirect('memberslist.php');
+    header('Location: memberslist.php');
+    exit;
 }
 
 // Search functionality
 $search = '';
 $where = '';
 $params = [];
-$types = '';
 
 if (isset($_GET['search'])) {
     $search = sanitize($_GET['search']);
     if (!empty($search)) {
         $where = "WHERE m.member_no LIKE ? OR m.full_name LIKE ? OR m.phone LIKE ?";
         $search_term = "%$search%";
-        $params = [$search_term, $search_term, $search_term];
-        $types = 'sss';
+        $params = array_fill(0, 3, $search_term);
     }
 }
 
 // Fetch members with their total savings
-$query = "SELECT m.member_no, m.full_name, m.phone, m.gender, m.occupation, 
-          COALESCE(SUM(s.amount), 0) as total_savings
-          FROM memberz m
-          LEFT JOIN savings s ON m.member_no = s.member_id
-          $where
-          GROUP BY m.member_no
-          ORDER BY m.full_name ASC";
+try {
+    $query = "SELECT m.member_no, m.full_name, m.phone, m.gender, m.occupation, 
+              COALESCE(SUM(s.amount), 0) as total_savings
+              FROM memberz m
+              LEFT JOIN savings s ON m.member_no = s.member_id
+              $where
+              GROUP BY m.member_no
+              ORDER BY m.full_name ASC";
 
-$stmt = $conn->prepare($query);
-if (!empty($params)) {
-    $stmt->bind_param($types, ...$params);
+    $stmt = $pdo->prepare($query);
+    $stmt->execute($params);
+    $members = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+} catch (PDOException $e) {
+    $_SESSION['error'] = "Failed to fetch members: " . $e->getMessage();
+    header('Location: memberslist.php');
+    exit;
 }
-
-if (!$stmt->execute()) {
-    $_SESSION['error'] = "Failed to fetch members: " . $conn->error;
-    redirect('memberslist.php');
-}
-
-$result = $stmt->get_result();
-$members = $result->fetch_all(MYSQLI_ASSOC);
 ?>
 
 <!DOCTYPE html>
@@ -130,11 +123,11 @@ $members = $result->fetch_all(MYSQLI_ASSOC);
                 </div>
 
                 <?php if (isset($_SESSION['success'])): ?>
-                    <div class="alert alert-success"><?= $_SESSION['success']; unset($_SESSION['success']); ?></div>
+                    <div class="alert alert-success"><?= htmlspecialchars($_SESSION['success']); unset($_SESSION['success']); ?></div>
                 <?php endif; ?>
                 
                 <?php if (isset($_SESSION['error'])): ?>
-                    <div class="alert alert-danger"><?= $_SESSION['error']; unset($_SESSION['error']); ?></div>
+                    <div class="alert alert-danger"><?= htmlspecialchars($_SESSION['error']); unset($_SESSION['error']); ?></div>
                 <?php endif; ?>
 
                 <div class="card shadow mb-4">
@@ -184,7 +177,7 @@ $members = $result->fetch_all(MYSQLI_ASSOC);
                                             <tr>
                                                 <td><?= htmlspecialchars($member['member_no']) ?></td>
                                                 <td><?= htmlspecialchars($member['full_name']) ?></td>
-                                                <td><?= htmlspecialchars(formatUgandanPhone($member['phone'])) ?></td>
+                                                <td><?= htmlspecialchars($member['phone']) ?></td>
                                                 <td><?= htmlspecialchars($member['gender']) ?></td>
                                                 <td><?= htmlspecialchars($member['occupation']) ?></td>
                                                 <td class="text-end total-savings">
@@ -192,19 +185,19 @@ $members = $result->fetch_all(MYSQLI_ASSOC);
                                                 </td>
                                                 <td class="action-btns">
                                                     <div class="d-flex gap-2">
-                                                        <a href="view.php?member_no=<?= $member['member_no'] ?>" 
+                                                        <a href="view.php?member_no=<?= urlencode($member['member_no']) ?>" 
                                                            class="btn btn-sm btn-info" title="View">
                                                             <i class="fas fa-eye"></i>
                                                         </a>
-                                                        <a href="edit.php?member_no=<?= $member['member_no'] ?>" 
+                                                        <a href="edit.php?member_no=<?= urlencode($member['member_no']) ?>" 
                                                            class="btn btn-sm btn-primary" title="Edit">
                                                             <i class="fas fa-edit"></i>
                                                         </a>
-                                                        <a href="savings.php?member_no=<?= $member['member_no'] ?>" 
+                                                        <a href="savings.php?member_no=<?= urlencode($member['member_no']) ?>" 
                                                            class="btn btn-sm btn-warning" title="Manage Savings">
                                                             <i class="fas fa-wallet"></i>
                                                         </a>
-                                                        <button onclick="confirmDelete('<?= $member['member_no'] ?>')" 
+                                                        <button onclick="confirmDelete('<?= htmlspecialchars($member['member_no'], ENT_QUOTES) ?>')" 
                                                                 class="btn btn-sm btn-danger" title="Delete">
                                                             <i class="fas fa-trash-alt"></i>
                                                         </button>
@@ -258,15 +251,10 @@ $members = $result->fetch_all(MYSQLI_ASSOC);
         // Delete confirmation
         function confirmDelete(member_no) {
             const deleteBtn = document.getElementById('deleteBtn');
-            deleteBtn.href = `memberslist.php?delete=${member_no}`;
+            deleteBtn.href = `memberslist.php?delete=${encodeURIComponent(member_no)}`;
             const modal = new bootstrap.Modal(document.getElementById('deleteModal'));
             modal.show();
         }
-        
-        // Format phone numbers as you type in search
-        document.querySelector('input[name="phone"]')?.addEventListener('input', function(e) {
-            this.value = this.value.replace(/[^0-9]/g, '');
-        });
     </script>
 </body>
 </html>
