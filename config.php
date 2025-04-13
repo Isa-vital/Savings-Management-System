@@ -11,6 +11,7 @@ error_reporting(E_ALL);
 date_default_timezone_set('Africa/Nairobi');
 
 // ==================== SECURE SESSION ====================
+
 session_start([
     'name' => 'SaccoSecureSession',
     'cookie_lifetime' => 86400,

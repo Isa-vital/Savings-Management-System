@@ -121,7 +121,7 @@ try {
                                 </div>
                             </div>
                             <div class="card-footer bg-light">
-                                <a href="members/list.php" class="text-decoration-none">
+                                <a href="members/memberslist.php" class="text-decoration-none">
                                     View all members <i class="fas fa-arrow-right ms-1"></i>
                                 </a>
                             </div>
