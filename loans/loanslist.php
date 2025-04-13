@@ -1,7 +1,6 @@
 <?php
 require_once __DIR__ . '/../config.php';
 require_once '../helpers/auth.php';
-
 // Authentication check
 if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'admin') {
     $_SESSION['error'] = "Unauthorized access. Admin privileges required.";
@@ -20,7 +19,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt = $pdo->prepare("UPDATE loans SET status = :status, processed_by = :processed_by, processed_at = NOW() WHERE id = :loan_id");
             $stmt->execute([
                 ':status' => $new_status,
-                ':processed_by' => $_SESSION['user']['id'],
+                ':processed_by' => $_SESSION['admins']['id'],
                 ':loan_id' => $loan_id
             ]);
             
@@ -269,11 +268,15 @@ function createRepaymentSchedule($pdo, $loan_id) {
                                                         <small class="text-muted"><?= htmlspecialchars($loan['member_no']) ?></small>
                                                     </a>
                                                 </td>
-                                                <td><?= formatUgandanPhone($loan['phone']) ?></td>
+                                                <td><?= ($loan['phone']) ?></td>
                                                 <td>UGX <?= number_format($loan['amount'], 2) ?></td>
                                                 <td><?= $loan['interest_rate'] ?>%</td>
                                                 <td><?= $loan['term_months'] ?> months</td>
-                                                <td><?= date('d M Y', strtotime($loan['application_date'])) ?></td>
+                                                <td>
+    <?= !empty($loan['application_date']) && $loan['application_date'] !== '0000-00-00' 
+        ? date('d M Y', strtotime($loan['application_date'])) 
+        : '<span class="text-muted">Not Submitted</span>' ?>
+</td>
                                                 <td>
                                                     <span class="status-<?= $loan['status'] ?>">
                                                         <?= ucfirst($loan['status']) ?>

@@ -230,7 +230,7 @@ try {
                         </a>
                     </div>
                     <div class="col-md-4 mb-3">
-                        <a href="loans/apply.php" class="btn btn-warning w-100 py-3">
+                        <a href="loans/newloan.php" class="btn btn-warning w-100 py-3">
                             <i class="fas fa-hand-holding-usd me-2"></i>Process Loan
                         </a>
                     </div>

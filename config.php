@@ -26,6 +26,8 @@ define('DB_NAME', 'savings_mgt_systemdb');
 define('DB_USER', 'root');
 define('DB_PASS', '');
 define('DB_PORT', '3306');
+define('DB_CHARSET', 'utf8mb4');         // Database charset
+
 
 try {
     $pdo = new PDO(
