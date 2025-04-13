@@ -12,13 +12,13 @@ date_default_timezone_set('Africa/Nairobi');
 
 // ==================== SECURE SESSION ====================
 
-session_start([
-    'name' => 'SaccoSecureSession',
-    'cookie_lifetime' => 86400,
-    'cookie_secure' => true,
-    'cookie_httponly' => true,
-    'use_strict_mode' => true
-]);
+// session_start([
+//     'name' => 'SaccoSecureSession',
+//     'cookie_lifetime' => 86400,
+//     'cookie_secure' => true,
+//     'cookie_httponly' => true,
+//     'use_strict_mode' => true
+// ]);
 
 // ==================== DATABASE (PDO POWER) ====================
 define('DB_HOST', 'localhost');

@@ -5,7 +5,7 @@
             <li class="nav-item dropdown">
                 <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown">
                     <i class="fas fa-user-circle me-1"></i>
-                    <?= htmlspecialchars($_SESSION['user']['username']) ?>
+                    <?= htmlspecialchars($_SESSION['admin']['username']) ?>
                 </a>
                 <ul class="dropdown-menu dropdown-menu-end">
                     <li><a class="dropdown-item" href="profile.php">Profile</a></li>

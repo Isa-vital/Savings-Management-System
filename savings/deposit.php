@@ -22,7 +22,7 @@ try {
 
     if (!$member) {
         $_SESSION['error'] = "Member not found";
-        header('Location: memberslist.php');
+        header('Location: savingssystem/members/memberslist.php');
         exit();
     }
 
@@ -86,7 +86,7 @@ try {
 } catch (PDOException $e) {
     error_log("Database error in deposit.php: " . $e->getMessage());
     $_SESSION['error'] = "A database error occurred. Please try again.";
-    header('Location: memberslist.php');
+    header('Location: ../members/memberslist.php');
     exit();
 }
 ?>

@@ -3,7 +3,7 @@
 session_start();
 
 // Define the absolute path to config.php
-$config_path = __DIR__ . '/../config.php'; // Adjust based on your actual structure
+$config_path = __DIR__ . '/../config.php'; // 
 
 // Verify the config file exists before requiring
 if (!file_exists($config_path)) {

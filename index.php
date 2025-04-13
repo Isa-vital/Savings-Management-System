@@ -1,24 +1,31 @@
 <?php
-/**
- * Rukindo Kweyamba System - Dashboard
- * 
- * Displays overview statistics and recent transactions
- */
+session_start();
+
+// Verify the session file exists and is writable
+if (!file_exists(session_save_path()) || !is_writable(session_save_path())) {
+    die('Session directory not writable: ' . session_save_path());
+}
+
+// Standardize session check
+if (!isset($_SESSION['admin']['id'])) {
+    header("Location: /savingssystem/auth/login.php");
+    exit;
+}
+
+// Database connection
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/includes/database.php';
+$pdo = $conn;
 
-// Redirect if not logged in
-if (!isset($_SESSION['user'])) {
-    header('Location: auth/login.php');
-    exit;
-}
+// Debug session
+error_log("Index session data: " . print_r($_SESSION, true));
 
-// Check user role for authorization
-if ($_SESSION['user']['role'] !== 'admin') {
+// Check user role
+if ($_SESSION['admin']['role'] !== 'admin') {
     $_SESSION['error'] = "Unauthorized access";
-    header('Location: members/list.php');
+    header('Location: /savingssystem/auth/login.php');
     exit;
 }
-
 // Initialize stats array
 $stats = [];
 $transactions = [];
@@ -121,7 +128,7 @@ try {
                                 </div>
                             </div>
                             <div class="card-footer bg-light">
-                                <a href="members/memberslist.php" class="text-decoration-none">
+                                <a href="/savingssystem/members/memberslist.php" class="text-decoration-none">
                                     View all members <i class="fas fa-arrow-right ms-1"></i>
                                 </a>
                             </div>
@@ -142,7 +149,7 @@ try {
                                 </div>
                             </div>
                             <div class="card-footer bg-light">
-                                <a href="savings/transactions.php" class="text-decoration-none">
+                                <a href="/savingssystem/savings/transactions.php" class="text-decoration-none">
                                     View transactions <i class="fas fa-arrow-right ms-1"></i>
                                 </a>
                             </div>
@@ -163,7 +170,7 @@ try {
                                 </div>
                             </div>
                             <div class="card-footer bg-light">
-                                <a href="loans/list.php" class="text-decoration-none">
+                                <a href="/savingssystem/loans/loanslist.php" class="text-decoration-none">
                                     Manage loans <i class="fas fa-arrow-right ms-1"></i>
                                 </a>
                             </div>

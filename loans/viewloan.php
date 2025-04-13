@@ -65,7 +65,7 @@ try {
         <div class="row">
             <div class="col-md-12">
                 <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h2>Loan Details #<?= $loanId ?></h2>
+                    <h2>Loan Details <?= $loanId ?></h2>
                     <a href="loanslist.php" class="btn btn-secondary">Back to Loans</a>
                 </div>
 
@@ -74,7 +74,7 @@ try {
 <div class="card-body">
     <div class="row">
         <div class="col-md-6">
-            <p><strong>Member:</strong> <?= htmlspecialchars($loan['member_name'] ?? 'N/A') ?></p>
+            <p><strong>Member:</strong> <?= htmlspecialchars($loan['full_name'] ?? 'N/A') ?></p>
             <p><strong>Phone:</strong> <?= formatUgandanPhone($loan['phone'] ?? '') ?></p>
             <p><strong>Email:</strong> <?= htmlspecialchars($loan['email'] ?? 'N/A') ?></p>
             <p><strong>Loan Type:</strong> <?= htmlspecialchars($loan['loan_type'] ?? 'N/A') ?></p>

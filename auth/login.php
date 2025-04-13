@@ -1,47 +1,46 @@
 <?php
-// Check if session is not already started
-if (session_status() == PHP_SESSION_NONE) {
+// At the VERY TOP (before any output)
+if (session_status() === PHP_SESSION_ACTIVE) {
+    session_unset();
+} else {
     session_start();
 }
 
 // Database configuration
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../includes/database.php';
+$pdo = $conn;
+
+// Initialize variables at the start
+$error = '';
+$username = '';
 
 // Check if already logged in
-if (isset($_SESSION['admin'])) {
+if (isset($_SESSION['admin']['id'])) {
     header("Location: ../index.php");
     exit;
 }
-
-// Initialize variables
-$error = '';
-$username = '';
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $username = trim($_POST['username']);
     $password = $_POST['password'];
 
-    // Basic validation
     if (empty($username) || empty($password)) {
         $error = "Username and password are required";
     } else {
         try {
-            // Get admin from database
-            $stmt = $pdo->prepare("SELECT id, username, password_hash, role FROM admins WHERE username = :username");
-            $stmt->execute([':username' => $username]);
+            $stmt = $pdo->prepare("SELECT id, username, password_hash, role FROM admins WHERE username = ?");
+            $stmt->execute([$username]);
             $admin = $stmt->fetch();
 
-            // Verify credentials
             if ($admin && password_verify($password, $admin['password_hash'])) {
-                // Set session
                 $_SESSION['admin'] = [
                     'id' => $admin['id'],
                     'username' => $admin['username'],
-                    'role' => $admin['role']
+                    'role' => $admin['role'],
+                    'last_activity' => time()
                 ];
-
-                // Redirect to dashboard
+                session_regenerate_id(true);
                 header("Location: ../index.php");
                 exit;
             } else {
