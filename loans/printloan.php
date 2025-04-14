@@ -1,5 +1,5 @@
 <?php
-require_once '../includes/dbconfig.php';
+require_once '../includes/database.php';
 require_once '../includes/functions.php';
 
 // Check if loan ID is provided
