@@ -1,13 +1,13 @@
 <?php
-require_once __DIR__ . '/../config.php';
+session_start(); 
 
-// Authentication check
-if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'admin') {
+if (!isset($_SESSION['admin']['id'])) {
     $_SESSION['error'] = "Unauthorized access";
-    header('Location: ../index.php');
+    header('Location: ../auth/login.php');
     exit;
 }
 
+require_once __DIR__ . '/../config.php';
 // Check if member ID is provided
 if (!isset($_GET['member_no'])) {
     $_SESSION['error'] = "Member ID not specified";

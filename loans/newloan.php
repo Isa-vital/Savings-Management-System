@@ -1,13 +1,14 @@
 <?php
+session_start(); 
+if (!isset($_SESSION['admin']['id'])) {
+    $_SESSION['error'] = "Unauthorized access";
+    header('Location: ../auth/login.php');
+    exit;
+}
+
 // Initialize session and check authentication
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../includes/database.php';
-
-// Check if user is logged in and has admin privileges
-if (!isset($_SESSION['admin']) || $_SESSION['admin']['role'] !== 'admin') {
-    header("Location: ../auth/login.php");
-    exit;
-}
 
 // Initialize variables
 $error = '';

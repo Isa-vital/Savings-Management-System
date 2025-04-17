@@ -115,7 +115,7 @@ function formatPhoneUG($phone) {
 }
 
 // ==================== APP CONSTANTS ====================
-define('APP_NAME', 'Rukindo Kweyamba SACCO');
+define('APP_NAME', 'Rukindo Kweyamba Savings Group');
 define('BASE_URL', 'https://' . $_SERVER['HTTP_HOST'] . '/');
 define('MAX_LOGIN_ATTEMPTS', 5);
 define('LOCKOUT_TIME', 15 * 60); // 15 minutes

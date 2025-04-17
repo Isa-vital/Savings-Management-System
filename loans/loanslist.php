@@ -1,12 +1,14 @@
 <?php
+session_start(); // ← Ensure this is there first
+
+if (!isset($_SESSION['admin']['id'])) {
+    $_SESSION['error'] = "Unauthorized access";
+    header('Location: ../auth/login.php');
+    exit;
+}
+
 require_once __DIR__ . '/../config.php';
 require_once '../helpers/auth.php';
-// Authentication check
-if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'admin') {
-    $_SESSION['error'] = "Unauthorized access. Admin privileges required.";
-    header('Location: ../index.php');
-    exit();
-}
 
 // Handle loan status updates
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {

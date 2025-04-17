@@ -1,12 +1,13 @@
 <?php
-require_once '../config.php';
+session_start(); // ← Ensure this is there first
 
-// Authentication check
-if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'admin') {
+if (!isset($_SESSION['admin']['id'])) {
     $_SESSION['error'] = "Unauthorized access";
-    redirect('../index.php');
+    header('Location: ../auth/login.php');
+    exit;
 }
 
+require_once '../config.php';
 // Ugandan districts array
 $uganda_districts = [
     "Kampala", "Wakiso", "Mukono", "Jinja", "Mbale", "Gulu", "Lira", "Mbarara", 

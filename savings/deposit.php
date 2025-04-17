@@ -1,9 +1,14 @@
 <?php
+session_start(); 
+
+if (!isset($_SESSION['admin']['id'])) {
+    $_SESSION['error'] = "Unauthorized access";
+    header('Location: ../auth/login.php');
+    exit;
+}
+
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../helpers/auth.php';
-
-// Authentication check - only allow logged in users
-require_login();
 
 // Check if member ID is provided
 if (!isset($_GET['member_id'])) {
