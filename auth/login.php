@@ -1,5 +1,5 @@
 <?php
-// At the VERY TOP (before any output)
+//session start At the VERY TOP (before any output)
 if (session_status() === PHP_SESSION_ACTIVE) {
     session_unset();
 } else {

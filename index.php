@@ -41,7 +41,7 @@ try {
     $stats['total_savings'] = $stmt->fetchColumn();
 
     // Active Loans
-    $stmt = $pdo->query("SELECT COUNT(*) as total FROM loans WHERE status = 'active'");
+    $stmt = $pdo->query("SELECT COUNT(*) as total FROM loans WHERE status = 'approved'");
     $stats['active_loans'] = $stmt->fetchColumn();
 
     // Recent Transactions (last 7 days)
@@ -232,7 +232,7 @@ try {
                         </a>
                     </div>
                     <div class="col-md-4 mb-3">
-                        <a href="savings/deposit.php" class="btn btn-success w-100 py-3">
+                        <a href="savings/savings.php" class="btn btn-success w-100 py-3">
                             <i class="fas fa-money-bill-wave me-2"></i>Record Savings
                         </a>
                     </div>
