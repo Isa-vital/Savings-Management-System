@@ -193,7 +193,7 @@ if ($selected_member_id) {
     <?= htmlspecialchars($s['receipt_no'] ?: 'N/A') ?>
     <?php if ($s['receipt_no']): ?>
         <a href="printreceipt.php?receipt_no=<?= urlencode($s['receipt_no']) ?>" target="_blank" class="btn btn-sm btn-outline-primary ms-2">
-            <i class="fas fa-print"></i> Print
+            <i class="fas fa-print" onclick="downloadPDF()"></i> Print
         </a>
     <?php endif; ?>
 </td>
@@ -211,6 +211,22 @@ if ($selected_member_id) {
         </main>
     </div>
 </div>
+
+
+<script>
+function downloadPDF() {
+  const element = document.getElementById('receipt');
+  const opt = {
+    margin:       0.5,
+    filename:     'Savings_Receipt_<?= htmlspecialchars($receipt['receipt_no']) ?>.pdf',
+    image:        { type: 'jpeg', quality: 0.98 },
+    html2canvas:  { scale: 2 },
+    jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+  };
+  html2pdf().set(opt).from(element).save();
+}
+</script>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

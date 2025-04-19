@@ -7,12 +7,17 @@
                 </a>
             </li>
             <li class="nav-item">
+                <a class="nav-link active fw-bold" href="/savingssystem/overview.php">
+                    <i class="fas fa-tachometer-alt me-2"></i>Stat Overview
+                </a>
+            </li>
+            <li class="nav-item">
                 <a class="nav-link fw-bold" href="/savingssystem/members/memberslist.php">
                     <i class="fas fa-users me-2"></i>Group Members
                 </a>
             </li>
             <li class="nav-item">
-                <a class="nav-link fw-bold" href="/savingssystem/savings/savings.php">
+                <a class="nav-link fw-bold" href="/savingssystem/savings/savingslist.php">
                     <i class="fas fa-wallet me-2"></i>Manage Savings
                 </a>
             </li>
