@@ -32,6 +32,30 @@ $savings = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <title>All Savings Records</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        .uganda-flag {
+            background: linear-gradient(to right, 
+                #000 0%, #000 33%, 
+                #FFC90D 33%, #FFC90D 66%, 
+                #DE2010 66%, #DE2010 100%);
+            height: 5px;
+            margin-bottom: 20px;
+        }
+        .total-savings {
+            font-weight: bold;
+            color: #28a745;
+        }
+        .action-btns .btn {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.875rem;
+        }
+        .table-responsive {
+            overflow-x: auto;
+        }
+        .search-box {
+            max-width: 400px;
+        }
+    </style>
 </head>
 <body>
 <?php include '../partials/navbar.php'; ?>
@@ -48,8 +72,11 @@ $savings = $stmt->fetchAll(PDO::FETCH_ASSOC);
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <input type="text" id="searchInput" class="form-control w-25" placeholder="Search...">
                 <div>
-                    
-                    <button onclick="exportCSV()" class="btn btn-sm btn-outline-success me-2">Export CSV</button>
+                   
+                    <a href="savings.php" class="btn btn-sm btn-outline-success me-2">
+                            <i class="fas fa-money-bill-wave me-2"></i>Add Savings
+                        </a>
+                    <button onclick="exportCSV()" class="btn btn-sm btn-outline-success me-2"> Export CSV</button>
                     <button onclick="downloadPDF()" class="btn btn-sm btn-outline-primary">Download PDF</button>
                 </div>
             </div>

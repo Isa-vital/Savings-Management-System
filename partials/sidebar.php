@@ -8,7 +8,7 @@
             </li>
             <li class="nav-item">
                 <a class="nav-link active fw-bold" href="/savingssystem/overview.php">
-                    <i class="fas fa-tachometer-alt me-2"></i>Stat Overview
+                    <i class="fas fa-area-chart me-2"></i>Stat Overview
                 </a>
             </li>
             <li class="nav-item">
@@ -26,6 +26,10 @@
                     <i class="fas fa-hand-holding-usd me-2"></i>Manage Loans
                 </a>
             </li>
+            <li class="nav-tem">
+                <a class="nav-link fw-bold" href="/savingssystem/calendar.php">
+                    <i class="fas fa-calendar-alt me-2"></i>Calendar
+                </a>
             <li class="nav-item">
                 <a class="nav-link fw-bold" href="/savingssystem/reports.php">
                     <i class="fas fa-chart-bar me-2"></i>Reports

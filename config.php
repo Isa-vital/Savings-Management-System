@@ -115,8 +115,9 @@ function formatPhoneUG($phone) {
 }
 
 // ==================== APP CONSTANTS ====================
-define('APP_NAME', 'Rukindo Kweyamba Savings Group');
-define('BASE_URL', 'https://' . $_SERVER['HTTP_HOST'] . '/');
+define('APP_NAME', 'Rukindo Kweyamba Savings Group');// Replace BASE_URL definition with this:
+$protocol = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? "https" : "http";
+define('BASE_URL', $protocol . '://' . $_SERVER['HTTP_HOST'] . '/savingssystem/');
 define('MAX_LOGIN_ATTEMPTS', 5);
 define('LOCKOUT_TIME', 15 * 60); // 15 minutes
 
