@@ -27,7 +27,7 @@
                 </a>
             </li>
             <li class="nav-item">
-                <a class="nav-link fw-bold" href="/savingssystem/reports/index.php">
+                <a class="nav-link fw-bold" href="/savingssystem/reports.php">
                     <i class="fas fa-chart-bar me-2"></i>Reports
                 </a>
             </li>

@@ -50,10 +50,11 @@ if (isset($_GET['search'])) {
 
 // Fetch members with their total savings
 try {
-    $query = "SELECT m.member_no, m.full_name, m.phone, m.gender, m.occupation, 
+    $query = "SELECT m.id, m.member_no, m.full_name, m.phone, m.gender, m.occupation, 
               COALESCE(SUM(s.amount), 0) as total_savings
               FROM memberz m
-              LEFT JOIN savings s ON m.member_no = s.member_id
+              LEFT JOIN savings s ON m.id = s.id
+              
               $where
               GROUP BY m.member_no
               ORDER BY m.full_name ASC";
@@ -194,10 +195,48 @@ try {
                                                            class="btn btn-sm btn-primary" title="Edit">
                                                             <i class="fas fa-edit"></i>
                                                         </a>
-                                                        <a href="savings.php?member_no=<?= urlencode($member['member_no']) ?>" 
+                                                        <div 
+                                                        data-bs-toggle="modal"
+                                                        data-bs-target="#addSavingsModal<?= $member['member_no'] ?>" >
+                                                        <a href="../savings/savings.php?member_no=<?= urlencode($member['member_no']) ?>" 
                                                            class="btn btn-sm btn-warning" title="Manage Savings">
                                                             <i class="fas fa-wallet"></i>
                                                         </a>
+                                        </div>
+                                                    
+                                   
+                            <div class="modal fade" id="addSavingsModal<?= $member['id'] ?>" tabindex="-1" aria-labelledby="addSavingsModalLabel" aria-hidden="true">
+                                <div class="modal-dialog">
+                                    <form method="POST" action="add-savings.php">
+                                        <div class="modal-content">
+                                            <div class="modal-header">
+                                                <h5 class="modal-title">Add Savings for <?= htmlspecialchars($member['full_name']) ?></h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                            </div>
+                                            <div class="modal-body">
+                                                <input type="hidden" name="member_id" value="<?= $member['id'] ?>">
+                                                <div class="mb-3">
+                                                    <label class="form-label">Amount (UGX)</label>
+                                                    <input type="number" name="amount" class="form-control" min="1000" required>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label class="form-label">Date</label>
+                                                    <input type="date" name="date" class="form-control" required>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label class="form-label">Notes</label>
+                                                    <textarea name="notes" class="form-control" rows="2"></textarea>
+                                                </div>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="submit" name="add_saving" class="btn btn-success">Save</button>
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                            </div>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                                
                                                         <button onclick="confirmDelete('<?= htmlspecialchars($member['member_no'], ENT_QUOTES) ?>')" 
                                                                 class="btn btn-sm btn-danger" title="Delete">
                                                             <i class="fas fa-trash-alt"></i>

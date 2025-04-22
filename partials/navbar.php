@@ -18,7 +18,7 @@
                 </a>
                 <ul class="dropdown-menu dropdown-menu-end shadow">
                     <li>
-                        <a class="dropdown-item fs-6" href="/savingssystem/profile.php">
+                        <a class="dropdown-item fs-6" href="/../savingssystem/profile.php">
                             <i class="fas fa-user me-2"></i> Profile
                         </a>
                     </li>
