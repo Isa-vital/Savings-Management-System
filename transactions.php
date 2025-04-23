@@ -1,8 +1,14 @@
 <?php
-// Initialize session and check authentication
 session_start();
+
+// Verify the session file exists and is writable
+if (!file_exists(session_save_path()) || !is_writable(session_save_path())) {
+    die('Session directory not writable: ' . session_save_path());
+}
+
+// Standardize session check
 if (!isset($_SESSION['admin']['id'])) {
-    header("Location: login.php");
+    header("Location: /savingssystem/auth/login.php");
     exit;
 }
 

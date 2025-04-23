@@ -149,7 +149,7 @@ try {
                                 </div>
                             </div>
                             <div class="card-footer bg-light">
-                                <a href="/savingssystem/savings/transactions.php" class="text-decoration-none">
+                                <a href="transactions.php" class="text-decoration-none">
                                     View transactions <i class="fas fa-arrow-right ms-1"></i>
                                 </a>
                             </div>

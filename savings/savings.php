@@ -55,8 +55,8 @@ if ($selected_member_id) {
 
                     $notes = $_POST['notes'] ?? '';
 
-                    if ($amount <= 0 || empty($date)) {
-                        throw new Exception("Amount and date are required.");
+                    if ($amount <= 1999 || empty($date)) {
+                        throw new Exception("Amount or date is invalid, cant be less!.");
                     }
 
                     $stmt = $pdo->prepare("INSERT INTO savings 
