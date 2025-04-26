@@ -1,6 +1,7 @@
 <?php
-session_start(); // ← Ensure this is there first
+session_start();
 
+// Check admin authentication
 if (!isset($_SESSION['admin']['id'])) {
     $_SESSION['error'] = "Unauthorized access";
     header('Location: ../auth/login.php');
@@ -16,11 +17,11 @@ if (isset($_GET['delete'])) {
     try {
         $pdo->beginTransaction();
         
-        // First delete from savings table
-        $stmt = $pdo->prepare("DELETE FROM savings WHERE member_id = ?");
+        // First delete related savings records
+        $stmt = $pdo->prepare("DELETE FROM savings WHERE member_id = (SELECT id FROM memberz WHERE member_no = ?)");
         $stmt->execute([$member_no]);
         
-        // Then delete from members table
+        // Then delete the member
         $stmt = $pdo->prepare("DELETE FROM memberz WHERE member_no = ?");
         $stmt->execute([$member_no]);
         
@@ -53,15 +54,17 @@ try {
     $query = "SELECT m.id, m.member_no, m.full_name, m.phone, m.gender, m.occupation, 
               COALESCE(SUM(s.amount), 0) as total_savings
               FROM memberz m
-              LEFT JOIN savings s ON m.id = s.id
-              
+              LEFT JOIN savings s ON m.id = s.member_id
               $where
-              GROUP BY m.member_no
+              GROUP BY m.id
               ORDER BY m.full_name ASC";
 
     $stmt = $pdo->prepare($query);
     $stmt->execute($params);
     $members = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // Calculate grand total savings
+    $grand_total = array_sum(array_column($members, 'total_savings'));
     
 } catch (PDOException $e) {
     $_SESSION['error'] = "Failed to fetch members: " . $e->getMessage();
@@ -75,7 +78,7 @@ try {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Manage Members - Ugandan SACCO</title>
+    <title>Manage Members - <?= htmlspecialchars(APP_NAME) ?></title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -152,6 +155,13 @@ try {
                                     </div>
                                 </form>
                             </div>
+                            <div class="col-md-6 text-end">
+                                <div class="text-muted">
+                                    <i class="fas fa-info-circle me-1"></i>
+                                    Total Members: <?= count($members) ?> | 
+                                    Total Savings: UGX <?= number_format($grand_total, 2) ?>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     
@@ -160,6 +170,7 @@ try {
                             <table class="table table-striped table-hover">
                                 <thead class="table-primary">
                                     <tr>
+                                        <th>#</th>
                                         <th>Member No</th>
                                         <th>Full Name</th>
                                         <th>Phone</th>
@@ -172,11 +183,12 @@ try {
                                 <tbody>
                                     <?php if (empty($members)): ?>
                                         <tr>
-                                            <td colspan="7" class="text-center">No members found</td>
+                                            <td colspan="8" class="text-center">No members found</td>
                                         </tr>
                                     <?php else: ?>
-                                        <?php foreach ($members as $member): ?>
+                                        <?php foreach ($members as $index => $member): ?>
                                             <tr>
+                                                <td><?= $index + 1 ?></td>
                                                 <td><?= htmlspecialchars($member['member_no']) ?></td>
                                                 <td><?= htmlspecialchars($member['full_name']) ?></td>
                                                 <td><?= htmlspecialchars($member['phone']) ?></td>
@@ -195,48 +207,10 @@ try {
                                                            class="btn btn-sm btn-primary" title="Edit">
                                                             <i class="fas fa-edit"></i>
                                                         </a>
-                                                        <div 
-                                                        data-bs-toggle="modal"
-                                                        data-bs-target="#addSavingsModal<?= $member['member_no'] ?>" >
                                                         <a href="../savings/savings.php?member_no=<?= urlencode($member['member_no']) ?>" 
                                                            class="btn btn-sm btn-warning" title="Manage Savings">
                                                             <i class="fas fa-wallet"></i>
                                                         </a>
-                                        </div>
-                                                    
-                                   
-                            <div class="modal fade" id="addSavingsModal<?= $member['id'] ?>" tabindex="-1" aria-labelledby="addSavingsModalLabel" aria-hidden="true">
-                                <div class="modal-dialog">
-                                    <form method="POST" action="add-savings.php">
-                                        <div class="modal-content">
-                                            <div class="modal-header">
-                                                <h5 class="modal-title">Add Savings for <?= htmlspecialchars($member['full_name']) ?></h5>
-                                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                                            </div>
-                                            <div class="modal-body">
-                                                <input type="hidden" name="member_id" value="<?= $member['id'] ?>">
-                                                <div class="mb-3">
-                                                    <label class="form-label">Amount (UGX)</label>
-                                                    <input type="number" name="amount" class="form-control" min="1000" required>
-                                                </div>
-                                                <div class="mb-3">
-                                                    <label class="form-label">Date</label>
-                                                    <input type="date" name="date" class="form-control" required>
-                                                </div>
-                                                <div class="mb-3">
-                                                    <label class="form-label">Notes</label>
-                                                    <textarea name="notes" class="form-control" rows="2"></textarea>
-                                                </div>
-                                            </div>
-                                            <div class="modal-footer">
-                                                <button type="submit" name="add_saving" class="btn btn-success">Save</button>
-                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                                            </div>
-                                        </div>
-                                    </form>
-                                </div>
-                            </div>
-                                
                                                         <button onclick="confirmDelete('<?= htmlspecialchars($member['member_no'], ENT_QUOTES) ?>')" 
                                                                 class="btn btn-sm btn-danger" title="Delete">
                                                             <i class="fas fa-trash-alt"></i>
@@ -250,9 +224,9 @@ try {
                                 <?php if (!empty($members)): ?>
                                     <tfoot>
                                         <tr class="table-active">
-                                            <td colspan="5" class="text-end fw-bold">Total Savings:</td>
+                                            <td colspan="6" class="text-end fw-bold">Grand Total Savings:</td>
                                             <td class="text-end fw-bold">
-                                                UGX <?= number_format(array_sum(array_column($members, 'total_savings')), 2) ?>
+                                                UGX <?= number_format($grand_total, 2) ?>
                                             </td>
                                             <td></td>
                                         </tr>

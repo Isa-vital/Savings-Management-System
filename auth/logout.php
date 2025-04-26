@@ -2,10 +2,11 @@
 // Start session before destroying it
 session_start();
 
-// Define the absolute path to config.php
-$config_path = __DIR__ . '/../config.php'; // 
+// Define the base directory
+$base_dir = __DIR__ . '/../';
 
 // Verify the config file exists before requiring
+$config_path = $base_dir . 'config.php';
 if (!file_exists($config_path)) {
     die('Configuration file not found at: ' . $config_path);
 }
@@ -42,14 +43,13 @@ header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
 header("Cache-Control: post-check=0, pre-check=0", false);
 header("Pragma: no-cache");
 
-// Redirect to login page using absolute URL
-$login_url = '/savingssystem/auth/login.php'; // Adjust if your login is in a different location
+// Calculate the correct path to login.php
+$login_path = '/savingssystem/auth/login.php';
 
-// Verify login page exists (for debugging)
-if (!file_exists($_SERVER['DOCUMENT_ROOT'] . $login_url)) {
-    die('Login page not found at: ' . $_SERVER['DOCUMENT_ROOT'] . $login_url);
-}
+// For debugging path issues (comment out in production)
+// error_log("Attempting to redirect to: " . $login_path);
 
-header("Location: $login_url");
+// Redirect to login page
+header("Location: $login_path");
 exit();
 ?>
