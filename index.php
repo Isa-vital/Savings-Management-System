@@ -45,13 +45,14 @@ try {
     $stats['active_loans'] = $stmt->fetchColumn();
 
     // Recent Transactions (last 7 days)
-    $stmt = $pdo->query("
-        SELECT t.id, m.full_name, t.amount, t.transaction_date, t.transaction_type 
-        FROM transactions t
-        JOIN memberz m ON t.member_id = m.member_no
-        ORDER BY t.transaction_date DESC 
-        LIMIT 10
-    ");
+$stmt = $pdo->query("
+SELECT t.id, m.full_name, t.amount, t.transaction_date, t.transaction_type 
+FROM transactions t
+JOIN memberz m ON t.member_id = m.id
+ORDER BY t.transaction_date DESC 
+LIMIT 10
+");
+
     $transactions = $stmt->fetchAll();
 
 } catch (PDOException $e) {
