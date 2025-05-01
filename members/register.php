@@ -355,7 +355,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <?php if (isset($_SESSION['success']) && $_SESSION['success'] === true): ?>
         document.addEventListener('DOMContentLoaded', function() {
             Swal.fire({
-                title: 'Registration Successful!',
+                title: '',
                 html: `
                     <div class="text-center">
                         <i class="fas fa-check-circle text-success mb-3" style="font-size: 4rem;"></i>

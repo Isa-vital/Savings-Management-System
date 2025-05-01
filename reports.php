@@ -178,7 +178,7 @@ try {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= htmlspecialchars(APP_NAME) ?> - Reports Dashboard</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
     <style>
         :root {
@@ -191,13 +191,10 @@ try {
         
         body {
             background-color: #f8f9fc;
-            font-family: 'Nunito', -apple-system, BlinkMacSystemFont, sans-serif;
+           /* font-family: 'Nunito', -apple-system, BlinkMacSystemFont, sans-serif; */
         }
         
-        .sidebar {
-            background: linear-gradient(180deg, var(--primary-color) 10%, #224abe 100%);
-            min-height: 100vh;
-        }
+    
         
         .card {
             border: none;
@@ -791,5 +788,6 @@ try {
             });
         });
     </script>
+     <?php include 'partials/footer.php'; ?>
 </body>
 </html>

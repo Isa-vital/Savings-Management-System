@@ -1,8 +1,5 @@
 <?php
-/**
- * Rukindo Kweyamba Savings System - Supercharged Config
- * Now with PDO Security & Better Performance
- */
+
 
 // ==================== CORE SETTINGS ====================
 ini_set('display_errors', 1);
@@ -115,7 +112,9 @@ function formatPhoneUG($phone) {
 }
 
 // ==================== APP CONSTANTS ====================
-define('APP_NAME', 'Rukindo Kweyamba Savings Group');// Replace BASE_URL definition with this:
+define('APP_NAME', 'Rukindo Kweyamba Savings Group');
+define('APP_VERSION', '1.0.1');
+define('APP_AUTHOR', 'Group 18');
 $protocol = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? "https" : "http";
 define('BASE_URL', $protocol . '://' . $_SERVER['HTTP_HOST'] . '/savingssystem/');
 define('MAX_LOGIN_ATTEMPTS', 5);

@@ -184,9 +184,9 @@ LIMIT 10
                     <div class="card-header bg-white">
                         <div class="d-flex justify-content-between align-items-center">
                             <h5 class="mb-0">
-                                <i class="fas fa-exchange-alt me-2"></i>Recent Transactions
+                                <i class="fas fa-exchange-alt me-2"></i>Recent Saving Transactions
                             </h5>
-                            <a href="savings/transactions.php" class="btn btn-sm btn-outline-primary">
+                            <a href="savings/savingslist.php" class="btn btn-sm btn-outline-primary">
                                 View All
                             </a>
                         </div>
@@ -246,6 +246,7 @@ LIMIT 10
             </main>
         </div>
     </div>
+    <?php include 'partials/footer.php'; ?>
     
     <!-- Bootstrap JS Bundle with Popper -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>

@@ -129,4 +129,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
         </main>
     </div>
+    <?php require_once 'partials/footer.php'; ?>
 </div>
+
+   

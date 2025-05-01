@@ -1,3 +1,5 @@
+<!----offline bootsrap--->
+<link rel="stylesheet" href="../css/custom.css">
 <div class="col-md-3 col-lg-2 d-md-block bg-light sidebar collapse">
     <div class="position-sticky pt-3">
         <ul class="nav flex-column">
@@ -6,11 +8,12 @@
                     <i class="fas fa-tachometer-alt me-2"></i>Dashboard
                 </a>
             </li>
-            <li class="nav-item">
+         <!---   <li class="nav-item">
                 <a class="nav-link active fw-bold" href="/savingssystem/overview.php">
                     <i class="fas fa-area-chart me-2"></i>Stat Overview
                 </a>
-            </li>
+            </li> 
+            --->
             <li class="nav-item">
                 <a class="nav-link fw-bold" href="/savingssystem/members/memberslist.php">
                     <i class="fas fa-users me-2"></i>Group Members
