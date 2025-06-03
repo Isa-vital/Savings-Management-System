@@ -1,0 +1,94 @@
+-- Members table (renamed from memberz for consistency)
+CREATE TABLE `members` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `member_no` varchar(20) NOT NULL DEFAULT 'TEMP',
+  `full_name` varchar(100) NOT NULL,
+  `nin_number` varchar(14) NOT NULL COMMENT 'Uganda National ID',
+  `gender` enum('Male','Female','Other') NOT NULL,
+  `dob` date NOT NULL,
+  `occupation` varchar(50) DEFAULT NULL,
+  `phone` varchar(10) NOT NULL COMMENT 'UG format without +256',
+  `email` varchar(100) DEFAULT NULL,
+  `district` varchar(50) NOT NULL,
+  `subcounty` varchar(50) DEFAULT NULL,
+  `village` varchar(50) DEFAULT NULL,
+  `address` text DEFAULT NULL,
+  `next_of_kin_name` varchar(100) DEFAULT NULL,
+  `next_of_kin_contact` varchar(10) DEFAULT NULL,
+  `reg_date` timestamp NOT NULL DEFAULT current_timestamp(),
+  `status` enum('active','inactive','suspended') DEFAULT 'active',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `member_no` (`member_no`),
+  UNIQUE KEY `nin_number` (`nin_number`),
+  KEY `district` (`district`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- Savings table
+CREATE TABLE `savings` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `member_id` int(11) NOT NULL,
+  `amount` decimal(10,2) NOT NULL,
+  `date` date NOT NULL,
+  `receipt_no` varchar(50) DEFAULT NULL,
+  `notes` text DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `member_id` (`member_id`),
+  CONSTRAINT `savings_ibfk_1` FOREIGN KEY (`member_id`) REFERENCES `members` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- Loans table
+CREATE TABLE `loans` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `member_id` int(11) NOT NULL,
+  `loan_number` varchar(20) NOT NULL,
+  `amount` decimal(12,2) NOT NULL,
+  `application_date` date DEFAULT NULL,
+  `interest_rate` decimal(5,2) NOT NULL,
+  `term_months` int(11) NOT NULL,
+  `purpose` varchar(255) DEFAULT NULL,
+  `monthly_repayment` decimal(12,2) NOT NULL,
+  `total_repayment` decimal(12,2) NOT NULL,
+  `status` enum('pending','approved','rejected','completed','defaulted') DEFAULT 'pending',
+  `processed_by` int(11) DEFAULT NULL,
+  `created_by` int(11) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `approved_at` datetime DEFAULT NULL,
+  `approved_by` int(11) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `loan_number` (`loan_number`),
+  KEY `member_id` (`member_id`),
+  CONSTRAINT `loans_ibfk_1` FOREIGN KEY (`member_id`) REFERENCES `members` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- Loan repayments table
+CREATE TABLE `loan_repayments` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `loan_id` int(11) NOT NULL,
+  `due_date` date NOT NULL,
+  `amount` decimal(12,2) NOT NULL,
+  `amount_paid` decimal(12,2) DEFAULT 0.00,
+  `payment_date` datetime DEFAULT NULL,
+  `status` enum('pending','partial','paid','late') DEFAULT 'pending',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `loan_id` (`loan_id`),
+  CONSTRAINT `loan_repayments_ibfk_1` FOREIGN KEY (`loan_id`) REFERENCES `loans` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- Transaction table to track all financial activities
+CREATE TABLE `transactions` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `member_id` int(11) NOT NULL,
+  `transaction_type` enum('savings_deposit','savings_withdrawal','loan_disbursement','loan_repayment','interest_charge','penalty') NOT NULL,
+  `amount` decimal(12,2) NOT NULL,
+  `reference_id` int(11) DEFAULT NULL COMMENT 'Links to savings_id or loan_id',
+  `reference_table` varchar(20) DEFAULT NULL COMMENT 'savings or loans',
+  `description` text DEFAULT NULL,
+  `transaction_date` timestamp NOT NULL DEFAULT current_timestamp(),
+  `recorded_by` int(11) NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `member_id` (`member_id`),
+  CONSTRAINT `transactions_ibfk_1` FOREIGN KEY (`member_id`) REFERENCES `members` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
