@@ -1,38 +1,63 @@
 <?php
-require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../config.php'; // Defines $pdo, APP_NAME, BASE_URL
+require_once __DIR__ . '/../helpers/auth.php'; // For require_login, has_role
+
+require_login();
 
 if (!isset($_GET['receipt_no'])) {
-    die('No receipt number provided.');
+    // It's better to display an error within the HTML structure if possible, but die() is simple.
+    $_SESSION['error_message'] = 'No receipt number provided.';
+    header('Location: ' . (BASE_URL ?? '../') . 'index.php'); // Redirect to a safe page
+    exit();
 }
 
-$receipt_no = $_GET['receipt_no'];
+$receipt_no = trim($_GET['receipt_no']);
+if (empty($receipt_no)) {
+    $_SESSION['error_message'] = 'Receipt number cannot be empty.';
+    header('Location: ' . (BASE_URL ?? '../') . 'index.php');
+    exit();
+}
 
 // Fetch the receipt data
-$stmt = $pdo->prepare("SELECT s.*, m.full_name, m.member_no FROM savings s 
+// Added s.member_id to the select list for authorization check
+$stmt = $pdo->prepare("SELECT s.id, s.amount, s.date, s.receipt_no, s.notes, s.member_id,
+                              m.full_name AS member_full_name, m.member_no
+                       FROM savings s
                        JOIN memberz m ON s.member_id = m.id 
-                       WHERE s.receipt_no = ?");
-$stmt->execute([$receipt_no]);
-$receipt = $stmt->fetch();
+                       WHERE s.receipt_no = :receipt_no");
+$stmt->execute(['receipt_no' => $receipt_no]);
+$receipt = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$receipt) {
-    die('Receipt not found.');
+    $_SESSION['error_message'] = 'Receipt not found.';
+    header('Location: ' . (BASE_URL ?? '../') . 'index.php');
+    exit();
 }
 
-// Fetch admin signature and full name
-$adminStmt = $pdo->prepare("SELECT full_name, signature FROM admins WHERE id = 1");
-$adminStmt->execute();
-$admin = $adminStmt->fetch();
-$signature_path = __DIR__ . '/../assets/uploads/' . $admin['signature'];
-$signature_web_path = '../assets/uploads/' . $admin['signature'];
+// Authorization Check
+$user_member_id = $_SESSION['user']['member_id'] ?? null;
+$is_owner = ($user_member_id && $user_member_id == $receipt['member_id']);
+$is_admin_type = has_role(['Core Admin', 'Administrator']);
 
-$admin_name = $admin['full_name'] ?? 'Producer';
+if ($is_admin_type) {
+    // Admins can view any receipt
+} elseif (has_role('Member') && $is_owner) {
+    // Members can view their own receipts
+} else {
+    $_SESSION['error_message'] = "Access Denied: You do not have permission to view this receipt.";
+    header('Location: ' . (BASE_URL ?? '../') . 'index.php');
+    exit();
+}
+
+// Static "Received By" information
+$received_by_name = APP_NAME ?? 'Rukindo Kweyamba Savings Group';
+
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Savings Receipt</title>
+  <title>Savings Receipt - <?php echo htmlspecialchars($receipt['receipt_no']); ?></title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <style>
@@ -85,36 +110,31 @@ $admin_name = $admin['full_name'] ?? 'Producer';
 
 <div class="receipt-container" id="receipt">
   <div class="header">
-    <h3>Rukindo Kweyamba Savings Group</h3>
-    <p>Rukindo Village, Mbarara, Uganda</p>
+    <h3><?php echo htmlspecialchars(APP_NAME ?? 'Rukindo Kweyamba Savings Group'); ?></h3>
+    <p>Rukindo Village, Mbarara, Uganda</p> <!-- Consider making these configurable if needed -->
     <p>Tel: +256 700 123 456 | Email: info@rksavingsgroup.org</p>
   </div>
 
   <h4 class="text-center mb-4">SAVINGS RECEIPT</h4>
   <table class="table table-bordered">
-    <tr><th>Receipt No</th><td><?= htmlspecialchars($receipt['receipt_no']) ?></td></tr>
-    <tr><th>Date</th><td><?= htmlspecialchars($receipt['date']) ?></td></tr>
-    <tr><th>Member Name</th><td><?= htmlspecialchars($receipt['full_name']) ?></td></tr>
-    <tr><th>Member No</th><td><?= htmlspecialchars($receipt['member_no']) ?></td></tr>
-    <tr><th>Amount</th><td>UGX <?= number_format($receipt['amount'], 2) ?></td></tr>
-    <tr><th>Notes</th><td><?= htmlspecialchars($receipt['notes']) ?></td></tr>
+    <tr><th>Receipt No</th><td><?php echo htmlspecialchars($receipt['receipt_no']); ?></td></tr>
+    <tr><th>Date</th><td><?php echo htmlspecialchars(date("d M, Y", strtotime($receipt['date']))); ?></td></tr>
+    <tr><th>Member Name</th><td><?php echo htmlspecialchars($receipt['member_full_name']); ?></td></tr>
+    <tr><th>Member No</th><td><?php echo htmlspecialchars($receipt['member_no']); ?></td></tr>
+    <tr><th>Amount</th><td><?php echo htmlspecialchars($settings['currency_symbol'] ?? 'UGX'); ?> <?php echo number_format($receipt['amount'], 2); ?></td></tr>
+    <tr><th>Notes</th><td><?php echo htmlspecialchars($receipt['notes']); ?></td></tr>
   </table>
 
-  <div class="text-end mt-2">
-    <p><strong>Received By:</strong></p>
-    <?php if ($admin['signature'] && file_exists($signature_path)): ?>
-  <img src="<?= $signature_web_path ?>" alt="Signature" class="signature"><br>
-<?php else: ?>
-  <p><em>No signature available</em></p>
-<?php endif; ?>
-
-    <p><strong><?= htmlspecialchars($admin_name) ?></strong></p>
+  <div class="text-end mt-4 pt-4 border-top">
+    <p class="mb-1"><strong>Received By:</strong></p>
+    <p class="mb-0"><em><?php echo htmlspecialchars($received_by_name); ?></em></p>
+    <p class="text-muted small mt-2">System Generated Receipt</p>
   </div>
 </div>
 
-<div class="text-center mt-4">
-  <button class="btn btn-success" onclick="downloadPDF()">Download PDF</button>
-  <a href="savings.php" class="btn btn-secondary">Back</a>
+<div class="text-center mt-4 mb-4 d-print-none">
+  <button class="btn btn-success" onclick="downloadPDF()"><i class="fas fa-download me-2"></i>Download PDF</button>
+  <a href="<?php echo (BASE_URL ?? '../') . 'index.php'; ?>" class="btn btn-secondary"><i class="fas fa-arrow-left me-2"></i>Back to Dashboard</a>
 </div>
 
 <script>
