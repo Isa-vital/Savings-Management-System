@@ -104,6 +104,11 @@ if (!defined('BASE_URL')) {
                             <i class="fas fa-piggy-bank me-2"></i>My Savings
                         </a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link fw-bold" href="<?php echo BASE_URL; ?>members/savings_performance.php">
+                            <i class="fas fa-chart-line me-2"></i>Savings Performance
+                        </a>
+                    </li>
                     <!-- Add more member-specific links here, e.g., My Loans, My Profile -->
                 <?php endif; ?>
             <?php endif; ?>
