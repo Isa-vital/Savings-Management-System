@@ -18,7 +18,7 @@ date_default_timezone_set('Africa/Nairobi');
 // ]);
 
 // ==================== DATABASE (PDO POWER) ====================
-define('DB_HOST', 'localhost');
+define('DB_HOST', '127.0.0.1');
 define('DB_NAME', 'savings_mgt_systemdb');
 define('DB_USER', 'root');
 define('DB_PASS', '');
@@ -75,20 +75,26 @@ function isLoggedIn() {
     return isset($_SESSION['user']);
 }
 
+/*
+// This function is now superseded by require_login() in helpers/auth.php
 function requireAuth() {
     if (!isLoggedIn()) {
         $_SESSION['redirect'] = $_SERVER['REQUEST_URI'];
         redirect('/auth/login.php');
     }
 }
+*/
 
+/*
+// This function is now superseded by require_admin() in helpers/auth.php
 function requireAdmin() {
     requireAuth();
-    if ($_SESSION['user']['role'] !== 'admin') {
+    if ($_SESSION['user']['role'] !== 'admin') { // Old role check
         $_SESSION['error'] = "Administrator privileges required";
         redirect('/dashboard.php');
     }
 }
+*/
 
 // ==================== CSRF PROTECTION ====================
 function generateToken() {

@@ -7,16 +7,14 @@ if (session_status() === PHP_SESSION_ACTIVE) {
 }
 
 // Database configuration
-require_once __DIR__ . '/../config.php';
-require_once __DIR__ . '/../includes/database.php';
-$pdo = $conn;
+require_once __DIR__ . '/../config.php'; // $pdo is available from here
 
 // Initialize variables at the start
 $error = '';
 $username = '';
 
 // Check if already logged in
-if (isset($_SESSION['admin']['id'])) {
+if (isset($_SESSION['user']['id'])) { // Changed from admin to user
     header("Location: ../index.php");
     exit;
 }
@@ -29,20 +27,49 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $error = "Username and password are required";
     } else {
         try {
-            $stmt = $pdo->prepare("SELECT id, username, password_hash, role FROM admins WHERE username = ?");
-            $stmt->execute([$username]);
-            $admin = $stmt->fetch();
+            // Target 'users' table and fetch necessary fields
+            $stmt = $pdo->prepare("SELECT id, username, password_hash, email, member_id, is_active FROM users WHERE username = :username");
+            $stmt->execute(['username' => $username]);
+            $user = $stmt->fetch();
 
-            if ($admin && password_verify($password, $admin['password_hash'])) {
-                $_SESSION['admin'] = [
-                    'id' => $admin['id'],
-                    'username' => $admin['username'],
-                    'role' => $admin['role'],
-                    'last_activity' => time()
-                ];
-                session_regenerate_id(true);
-                header("Location: ../index.php");
-                exit;
+            if ($user && password_verify($password, $user['password_hash'])) {
+                // Check if account is active
+                if (!$user['is_active']) {
+                    $error = "Your account is not active. Please check your email to activate it or contact an administrator.";
+                } else {
+                    // Fetch roles
+                    $rolesStmt = $pdo->prepare("
+                        SELECT r.role_name
+                        FROM roles r
+                        JOIN user_group_roles ugr ON r.id = ugr.role_id
+                        WHERE ugr.user_id = :user_id
+                    ");
+                    $rolesStmt->execute(['user_id' => $user['id']]);
+                    $roles = $rolesStmt->fetchAll(PDO::FETCH_COLUMN);
+
+                    // Fetch groups
+                    $groupsStmt = $pdo->prepare("
+                        SELECT g.group_name
+                        FROM groups g
+                        JOIN user_group_roles ugr ON g.id = ugr.group_id
+                        WHERE ugr.user_id = :user_id
+                    ");
+                    $groupsStmt->execute(['user_id' => $user['id']]);
+                    $groups = $groupsStmt->fetchAll(PDO::FETCH_COLUMN);
+
+                    $_SESSION['user'] = [ // Changed from admin to user
+                        'id' => $user['id'],
+                        'username' => $user['username'],
+                        'email' => $user['email'],
+                        'member_id' => $user['member_id'],
+                        'roles' => $roles,
+                        'groups' => $groups,
+                        'last_activity' => time()
+                    ];
+                    session_regenerate_id(true);
+                    header("Location: ../index.php");
+                    exit;
+                }
             } else {
                 $error = "Invalid username or password";
             }
@@ -57,7 +84,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Admin Login</title>
+    <title>User Login</title> // Changed from Admin Login
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         body {
@@ -77,7 +104,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <div class="container">
         <div class="login-card card shadow">
             <div class="card-header bg-primary text-white">
-                <h4 class="mb-0">Admin Login</h4>
+                <h4 class="mb-0">User Login</h4> <!-- Changed from Admin Login -->
             </div>
             <div class="card-body">
                 <?php if ($error): ?>
