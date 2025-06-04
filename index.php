@@ -8,7 +8,7 @@ if (!file_exists(session_save_path()) || !is_writable(session_save_path())) {
 
 // Standardize session check
 if (!isset($_SESSION['admin']['id'])) {
-    header("Location: /savingssystem/auth/login.php");
+    header("Location: /savingssystem/landing.php");
     exit;
 }
 
