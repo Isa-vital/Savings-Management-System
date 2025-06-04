@@ -1,0 +1,40 @@
+-- SQL Query to Insert a New Admin User
+-- This query adds a new administrator to the 'admins' table.
+--
+-- IMPORTANT: Before running this query, you MUST generate a secure password hash.
+--
+INSERT INTO `admins` (`username`, `password_hash`, `role`) VALUES ('coreadmin', 'YOUR_HASHED_PASSWORD_HERE', 'admin');
+
+-- Instructions for Use:
+--
+-- 1. Generate a Secure Password Hash:
+--    Replace 'YOUR_HASHED_PASSWORD_HERE' in the query above with a securely hashed password.
+--    You can generate a suitable hash using PHP's `password_hash()` function.
+--    Open a PHP interactive shell (php -a) or create a temporary PHP file with the following content:
+--
+--    <?php
+--    echo password_hash('yourchosenpassword', PASSWORD_DEFAULT);
+--    ?>
+--
+--    Execute this PHP code. It will output a long string – this is your hashed password.
+--    Example: If you choose 'admin123' as your password, the output might be something like
+--             '$2y$10$Y.DRiG...'. Copy this entire string.
+--
+-- 2. Replace Placeholder in Query:
+--    In the SQL query above, substitute 'YOUR_HASHED_PASSWORD_HERE' with the actual hash you generated.
+--    For example:
+--    INSERT INTO `admins` (`username`, `password_hash`, `role`) VALUES ('coreadmin', '$2y$10$Y.DRiG...................................................', 'admin');
+--
+-- 3. Execute the SQL Query:
+--    Log in to your MySQL database management tool (e.g., phpMyAdmin, MySQL Workbench, or the MySQL command line interface).
+--    Select the correct database for your application.
+--    Run the modified SQL query.
+--
+-- 4. Verify:
+--    You can verify the insertion by running:
+--    SELECT * FROM `admins` WHERE `username` = 'coreadmin';
+--
+-- Security Note:
+-- - Always use strong, unique passwords for admin accounts.
+-- - Ensure your PHP application uses `password_verify()` to check passwords during login.
+-- - Keep your hashing method (PASSWORD_DEFAULT) up-to-date with PHP recommendations.
