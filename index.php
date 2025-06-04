@@ -7,25 +7,49 @@ if (!file_exists(session_save_path()) || !is_writable(session_save_path())) {
 }
 
 // Standardize session check
-if (!isset($_SESSION['admin']['id'])) {
-    header("Location: /savingssystem/landing.php");
+// config.php should be included first to make BASE_URL available.
+require_once __DIR__ . '/config.php'; 
+require_once __DIR__ . '/helpers/auth.php'; // Include the new auth helpers
+
+// Ensure BASE_URL is defined, with a fallback if necessary (though config.php should handle this)
+if (!defined('BASE_URL')) {
+    // Basic auto-detection for BASE_URL if running in a subdirectory
+    $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' || $_SERVER['SERVER_PORT'] == 443) ? "https://" : "http://";
+    $host = $_SERVER['HTTP_HOST'];
+    $script_name = $_SERVER['SCRIPT_NAME']; // e.g., /savingsapp/index.php
+    $base_path = rtrim(dirname($script_name), '/\\'); 
+    if ($base_path === '' || $base_path === $script_name) { 
+        $base_path = ''; 
+    }
+    define('BASE_URL', $protocol . $host . $base_path . '/');
+}
+
+
+if (!isset($_SESSION['user']['id'])) { // Check the new session structure
+    // Redirect to landing page if not logged in, as login page is for explicit login action.
+    // Or, redirect to login page if that's preferred flow. Landing page seems more user-friendly.
+    header("Location: " . BASE_URL . "landing.php"); 
     exit;
 }
 
-// Database connection
-require_once __DIR__ . '/config.php';
-require_once __DIR__ . '/includes/database.php';
-$pdo = $conn;
+// $pdo is already available from config.php, so no need for includes/database.php or $pdo=$conn;
 
-// Debug session
-error_log("Index session data: " . print_r($_SESSION, true));
+// Debug session - focus on the user part
+error_log("Index session data for user: " . print_r($_SESSION['user'] ?? 'No user session', true));
 
-// Check user role
-if ($_SESSION['admin']['role'] !== 'admin') {
-    $_SESSION['error'] = "Unauthorized access";
-    header('Location: /savingssystem/auth/login.php');
+// Check if the user has the required role(s) for this admin dashboard
+if (!has_role(['Core Admin', 'Administrator'])) {
+    // If logged in but not an admin/core_admin, redirect to landing or a member dashboard.
+    $_SESSION['error_message'] = "You do not have permission to access this dashboard."; // Use the new session key
+    // Potentially redirect to a member-specific dashboard if one exists and user is a member
+    if (has_role('Member') && isset($_SESSION['user']['member_id'])) {
+        header('Location: ' . BASE_URL . 'members/my_savings.php'); // Example member page
+    } else {
+        header('Location: ' . BASE_URL . 'landing.php'); // Default redirect for non-privileged users
+    }
     exit;
 }
+
 // Initialize stats array
 $stats = [];
 $transactions = [];
@@ -45,14 +69,13 @@ try {
     $stats['active_loans'] = $stmt->fetchColumn();
 
     // Recent Transactions (last 7 days)
-$stmt = $pdo->query("
-SELECT t.id, m.full_name, t.amount, t.transaction_date, t.transaction_type 
-FROM transactions t
-JOIN memberz m ON t.member_id = m.id
-ORDER BY t.transaction_date DESC 
-LIMIT 10
-");
-
+    $stmt = $pdo->query("
+        SELECT t.id, m.full_name, t.amount, t.transaction_date, t.transaction_type 
+        FROM transactions t
+        JOIN memberz m ON t.member_id = m.member_no
+        ORDER BY t.transaction_date DESC 
+        LIMIT 10
+    ");
     $transactions = $stmt->fetchAll();
 
 } catch (PDOException $e) {
@@ -150,7 +173,7 @@ LIMIT 10
                                 </div>
                             </div>
                             <div class="card-footer bg-light">
-                                <a href="transactions.php" class="text-decoration-none">
+                                <a href="/savingssystem/savings/transactions.php" class="text-decoration-none">
                                     View transactions <i class="fas fa-arrow-right ms-1"></i>
                                 </a>
                             </div>
@@ -184,9 +207,9 @@ LIMIT 10
                     <div class="card-header bg-white">
                         <div class="d-flex justify-content-between align-items-center">
                             <h5 class="mb-0">
-                                <i class="fas fa-exchange-alt me-2"></i>Recent Saving Transactions
+                                <i class="fas fa-exchange-alt me-2"></i>Recent Transactions
                             </h5>
-                            <a href="savings/savingslist.php" class="btn btn-sm btn-outline-primary">
+                            <a href="savings/transactions.php" class="btn btn-sm btn-outline-primary">
                                 View All
                             </a>
                         </div>
@@ -246,7 +269,6 @@ LIMIT 10
             </main>
         </div>
     </div>
-    <?php include 'partials/footer.php'; ?>
     
     <!-- Bootstrap JS Bundle with Popper -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>

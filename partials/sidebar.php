@@ -6,7 +6,7 @@ if (session_status() === PHP_SESSION_NONE) {
 // Make sure helpers are available for role checks
 // Assuming config.php (which defines BASE_URL) is loaded by the parent script including this sidebar.
 // If not, it would need: require_once __DIR__ . '/../config.php';
-require_once __DIR__ . '/../helpers/auth.php';
+require_once __DIR__ . '/../helpers/auth.php'; 
 
 // Define BASE_URL if not already defined (fallback, ideally set in config.php)
 if (!defined('BASE_URL')) {
@@ -24,8 +24,6 @@ if (!defined('BASE_URL')) {
 }
 
 ?>
-<!----offline bootsrap--->
-<link rel="stylesheet" href="../css/custom.css">
 <div class="col-md-3 col-lg-2 d-md-block bg-light sidebar collapse">
     <div class="position-sticky pt-3">
         <ul class="nav flex-column">
@@ -38,8 +36,7 @@ if (!defined('BASE_URL')) {
                 <a class="nav-link active fw-bold" href="<?php echo BASE_URL; ?>overview.php">
                     <i class="fas fa-tachometer-alt me-2"></i>Stat Overview
                 </a>
-            </li> 
-            --->
+            </li>
             <li class="nav-item">
                 <a class="nav-link fw-bold" href="<?php echo BASE_URL; ?>members/memberslist.php">
                     <i class="fas fa-users me-2"></i>Group Members
@@ -55,16 +52,12 @@ if (!defined('BASE_URL')) {
                     <i class="fas fa-hand-holding-usd me-2"></i>Manage Loans
                 </a>
             </li>
-            <li class="nav-tem">
-                <a class="nav-link fw-bold" href="/savingssystem/calendar.php">
-                    <i class="fas fa-calendar-alt me-2"></i>Calendar
-                </a>
             <li class="nav-item">
                 <a class="nav-link fw-bold" href="<?php echo BASE_URL; ?>reports.php">
                     <i class="fas fa-chart-bar me-2"></i>Reports
                 </a>
             </li>
-
+            
             <!-- Administration Section -->
             <?php if (is_logged_in()): // Show Administration heading only if logged in and has any admin rights ?>
                 <?php if (has_role(['Core Admin', 'Administrator'])): ?>
@@ -119,7 +112,7 @@ if (!defined('BASE_URL')) {
                     <!-- Add more member-specific links here, e.g., My Loans, My Profile -->
                 <?php endif; ?>
             <?php endif; ?>
-
+            
             <!-- General Settings Link (kept for now, review its purpose) -->
             <li class="nav-item">
                 <a class="nav-link fw-bold" href="<?php echo BASE_URL; ?>profile.php"> <!-- Changed from index.php to profile.php as a more likely target -->
