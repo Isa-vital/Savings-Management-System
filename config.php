@@ -122,7 +122,9 @@ define('APP_NAME', 'Rukindo Kweyamba Savings Group');
 define('APP_VERSION', '1.0.1');
 define('APP_AUTHOR', 'Group 18');
 $protocol = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? "https" : "http";
-define('BASE_URL', $protocol . '://' . $_SERVER['HTTP_HOST'] . '/savingssystem/');
+$host = isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : 'localhost';
+define('APP_URL', $protocol . '://' . $host . '/savings_mgt_system');
+
 define('MAX_LOGIN_ATTEMPTS', 5);
 define('LOCKOUT_TIME', 15 * 60); // 15 minutes
 

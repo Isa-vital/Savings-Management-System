@@ -84,7 +84,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>User Login</title> // Changed from Admin Login
+    <title>User Login</title> 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         body {
@@ -104,7 +104,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <div class="container">
         <div class="login-card card shadow">
             <div class="card-header bg-primary text-white">
-                <h4 class="mb-0">User Login</h4> <!-- Changed from Admin Login -->
+                <h4 class="mb-0">User Login</h4> 
             </div>
             <div class="card-body">
                 <?php if ($error): ?>
