@@ -7,25 +7,49 @@ if (!file_exists(session_save_path()) || !is_writable(session_save_path())) {
 }
 
 // Standardize session check
-if (!isset($_SESSION['admin']['id'])) {
-    header("Location: /savingssystem/auth/login.php");
-    exit;
-}
-
-// Database connection
+// config.php should be included first to make BASE_URL available.
 require_once __DIR__ . '/config.php';
-require_once __DIR__ . '/includes/database.php';
-$pdo = $conn;
+require_once __DIR__ . '/helpers/auth.php'; // Include the new auth helpers
 
-// Debug session
-error_log("Index session data: " . print_r($_SESSION, true));
+// Ensure BASE_URL is defined, with a fallback if necessary (though config.php should handle this)
+if (!defined('BASE_URL')) {
+    // Basic auto-detection for BASE_URL if running in a subdirectory
+    $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' || $_SERVER['SERVER_PORT'] == 443) ? "https://" : "http://";
+    $host = $_SERVER['HTTP_HOST'];
+    $script_name = $_SERVER['SCRIPT_NAME']; // e.g., /savingsapp/index.php
+    $base_path = rtrim(dirname($script_name), '/\\');
+    if ($base_path === '' || $base_path === $script_name) {
+        $base_path = '';
+    }
+    define('BASE_URL', $protocol . $host . $base_path . '/');
+}
 
-// Check user role
-if ($_SESSION['admin']['role'] !== 'admin') {
-    $_SESSION['error'] = "Unauthorized access";
-    header('Location: /savingssystem/auth/login.php');
+
+if (!isset($_SESSION['user']['id'])) { // Check the new session structure
+    // Redirect to landing page if not logged in, as login page is for explicit login action.
+    // Or, redirect to login page if that's preferred flow. Landing page seems more user-friendly.
+    header("Location: " . BASE_URL . "landing.php");
     exit;
 }
+
+// $pdo is already available from config.php, so no need for includes/database.php or $pdo=$conn;
+
+// Debug session - focus on the user part
+error_log("Index session data for user: " . print_r($_SESSION['user'] ?? 'No user session', true));
+
+// Check if the user has the required role(s) for this admin dashboard
+if (!has_role(['Core Admin', 'Administrator'])) {
+    // If logged in but not an admin/core_admin, redirect to landing or a member dashboard.
+    $_SESSION['error_message'] = "You do not have permission to access this dashboard."; // Use the new session key
+    // Potentially redirect to a member-specific dashboard if one exists and user is a member
+    if (has_role('Member') && isset($_SESSION['user']['member_id'])) {
+        header('Location: ' . BASE_URL . 'members/my_savings.php'); // Example member page
+    } else {
+        header('Location: ' . BASE_URL . 'landing.php'); // Default redirect for non-privileged users
+    }
+    exit;
+}
+
 // Initialize stats array
 $stats = [];
 $transactions = [];
