@@ -58,40 +58,61 @@ if (!defined('BASE_URL')) {
                 </a>
             </li>
 
-            <!-- Administration Section -->
-            <?php if (is_logged_in()): // Show Administration heading only if logged in and has any admin rights ?>
-                <?php if (has_role(['Core Admin', 'Administrator'])): ?>
-                    <li class="nav-item nav-category">
-                        <span class="nav-link disabled text-muted">Administration</span>
-                    </li>
-                <?php endif; ?>
+            <!-- Administration Section Dropdown -->
+            <?php
+            // Determine if any admin links should be shown, to display the Administration dropdown itself
+            if (is_logged_in()) { // Check if logged in first
+                $can_see_system_settings = has_role('Core Admin');
+                $can_see_user_management = has_role(['Core Admin', 'Administrator']);
+                $can_see_group_management = has_role('Core Admin'); // Group management itself and assigning users often Core Admin
 
-                <?php if (has_role(['Core Admin', 'Administrator'])): ?>
+                if ($can_see_system_settings || $can_see_user_management || $can_see_group_management) :
+                ?>
                     <li class="nav-item">
-                        <a class="nav-link fw-bold" href="<?php echo BASE_URL; ?>admin/user_management/index.php">
-                            <i class="fas fa-users-cog me-2"></i>User Management
+                        <a class="nav-link fw-bold d-flex justify-content-between align-items-center" href="#adminSubmenu" data-bs-toggle="collapse" role="button" aria-expanded="false" aria-controls="adminSubmenu">
+                            <span>
+                                <i class="fas fa-shield-alt me-2"></i> Administration
+                            </span>
+                            <i class="fas fa-chevron-down small"></i>
                         </a>
-                    </li>
-                <?php endif; ?>
+                        <div class="collapse ps-3" id="adminSubmenu">
+                            <ul class="nav flex-column">
+                                <?php if ($can_see_system_settings) : ?>
+                                <li class="nav-item">
+                                    <a class="nav-link" href="<?= htmlspecialchars(BASE_URL . 'admin/system_settings/index.php') ?>">
+                                        <i class="fas fa-cogs me-2 text-secondary"></i> System Settings
+                                    </a>
+                                </li>
+                                <?php endif; ?>
 
-                <?php if (has_role('Core Admin')): ?>
-                    <li class="nav-item">
-                        <a class="nav-link fw-bold" href="<?php echo BASE_URL; ?>admin/group_management/index.php">
-                            <i class="fas fa-layer-group me-2"></i>Group Management
-                        </a>
+                                <?php if ($can_see_user_management) : ?>
+                                <li class="nav-item">
+                                    <a class="nav-link" href="<?= htmlspecialchars(BASE_URL . 'admin/user_management/index.php') ?>">
+                                        <i class="fas fa-users-cog me-2 text-secondary"></i> User Management
+                                    </a>
+                                </li>
+                                <?php endif; ?>
+
+                                <?php if ($can_see_group_management) : ?>
+                                <li class="nav-item">
+                                    <a class="nav-link" href="<?= htmlspecialchars(BASE_URL . 'admin/group_management/index.php') ?>">
+                                        <i class="fas fa-layer-group me-2 text-secondary"></i> Group Management
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link" href="<?= htmlspecialchars(BASE_URL . 'admin/group_management/assign_users.php') ?>">
+                                        <i class="fas fa-user-tag me-2 text-secondary"></i> Assign User Roles
+                                    </a>
+                                </li>
+                                <?php endif; ?>
+
+                            </ul>
+                        </div>
                     </li>
-                     <li class="nav-item">
-                        <a class="nav-link fw-bold" href="<?php echo BASE_URL; ?>admin/group_management/assign_users.php"> <!-- Assuming assign_users is part of group mgmt -->
-                            <i class="fas fa-user-friends me-2"></i>Assign Users to Groups
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link fw-bold" href="<?php echo BASE_URL; ?>admin/system_settings/index.php">
-                            <i class="fas fa-cogs me-2"></i>System Settings
-                        </a>
-                    </li>
-                <?php endif; ?>
-            <?php endif; ?>
+                <?php
+                endif;
+            } // end is_logged_in()
+            ?>
 
             <!-- Member Area -->
             <?php if (is_logged_in() && isset($_SESSION['user']['member_id']) && !empty($_SESSION['user']['member_id'])): ?>

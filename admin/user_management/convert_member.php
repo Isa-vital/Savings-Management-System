@@ -1,6 +1,15 @@
 <?php
+<?php
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\SMTP;
+use PHPMailer\PHPMailer\Exception;
+
 require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../../helpers/auth.php';
+// Adjust path if your vendor directory is elsewhere relative to this script
+// Assuming vendor/autoload.php is in the project root, and this script is two levels down (admin/user_management/)
+require_once __DIR__ . '/../../vendor/autoload.php';
+
 
 require_admin(); // Core Admin or Administrator
 
@@ -97,20 +106,74 @@ try {
 
     $pdo->commit();
 
-    // 5. Notifications (Simulated)
+    // 5. Notifications (Actual Email Sending)
     $activation_link = rtrim(BASE_URL ?? '', '/') . '/auth/activate_account.php?token=' . $activation_token;
+    $email_send_error_message = ''; // To store potential email error
 
-    // TODO: Implement actual email sending.
-    // For now, we can store it in a session variable for testing/display if needed, or log it.
-    $email_message = "Dear " . htmlspecialchars($member['full_name']) . ",\n\nPlease click the following link to activate your account and set your password:\n" . $activation_link . "\n\nThis link will expire in 24 hours.\n\nRegards,\n" . ($settings['site_name'] ?? APP_NAME);
-    error_log("Activation Email for " . $member['email'] . ": " . $email_message); // Log for now
-    // mail($member['email'], "Activate Your Account - " . ($settings['site_name'] ?? APP_NAME), $email_message);
+    $mail = new PHPMailer(true);
+    try {
+        //Server settings from config.php
+        $mail->SMTPDebug = SMTP::DEBUG_OFF; // Set to SMTP::DEBUG_SERVER for detailed debugging output
+        $mail->isSMTP();
+        $mail->Host       = SMTP_HOST;
+        $mail->SMTPAuth   = true;
+        $mail->Username   = SMTP_USERNAME;
+        $mail->Password   = SMTP_PASSWORD;
 
-    // TODO: Implement actual SMS sending.
-    $sms_message = "Activate your account for " . ($settings['site_name'] ?? APP_NAME) . " using this link: " . $activation_link;
-    error_log("Activation SMS for " . $member['phone'] . ": " . $sms_message); // Log for now
+        if (defined('SMTP_ENCRYPTION') && SMTP_ENCRYPTION === 'tls') {
+            $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+        } elseif (defined('SMTP_ENCRYPTION') && SMTP_ENCRYPTION === 'ssl') {
+            $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
+        }
+        // If SMTP_ENCRYPTION is false or not 'tls'/'ssl', SMTPSecure remains PHPMailer's default (usually none)
+        // For explicit 'false' or empty, PHPMailer might still attempt opportunistic TLS if server supports it.
+        // To truly disable, one might need $mail->SMTPAutoTLS = false; if $mail->SMTPSecure is not set.
+        // The provided block implies if not 'tls' or 'ssl', it's effectively 'none' or relies on PHPMailer defaults.
 
-    $_SESSION['success_message'] = "User account creation initiated for " . htmlspecialchars($member['full_name']) . " (Username: " . htmlspecialchars($username) . "). An activation link has been (notionally) sent to their email and phone. Activation link for testing: " . $activation_link;
+        $mail->Port       = SMTP_PORT;
+
+        //Recipients
+        $recipient_email = $member['email'];
+        $recipient_name = $member['full_name'];
+        $mail->setFrom(MAIL_FROM_EMAIL, MAIL_FROM_NAME);
+        $mail->addAddress($recipient_email, $recipient_name);
+
+        // Content
+        $mail->isHTML(true);
+        $mail->Subject = 'Activate Your ' . (APP_NAME ?? 'SACCO') . ' Account';
+
+        $email_body = "Hello " . htmlspecialchars($recipient_name) . ",<br><br>";
+        $email_body .= "An account has been created for you on " . (APP_NAME ?? 'Our Platform') . ".<br>";
+        $email_body .= "Please click the link below to activate your account and set your password:<br>";
+        $email_body .= "<a href='" . $activation_link . "'>" . $activation_link . "</a><br><br>";
+        $email_body .= "This link will expire in 24 hours.<br><br>";
+        $email_body .= "If you did not request this, please ignore this email.<br><br>";
+        $email_body .= "Regards,<br>The " . (APP_NAME ?? 'SACCO') . " Team";
+
+        $alt_email_body = "Hello " . htmlspecialchars($recipient_name) . ",\n\n";
+        $alt_email_body .= "An account has been created for you on " . (APP_NAME ?? 'Our Platform') . ".\n";
+        $alt_email_body .= "Please copy and paste the following link into your browser to activate your account and set your password:\n";
+        $alt_email_body .= $activation_link . "\n\n";
+        $alt_email_body .= "This link will expire in 24 hours.\n\n";
+        $alt_email_body .= "If you did not request this, please ignore this email.\n\n";
+        $alt_email_body .= "Regards,\nThe " . (APP_NAME ?? 'SACCO') . " Team";
+
+        $mail->Body = $email_body;
+        $mail->AltBody = $alt_email_body;
+
+        $mail->send();
+        $_SESSION['success_message'] = "User account for " . htmlspecialchars($recipient_name) . " (Username: " . htmlspecialchars($username) . ") created. Activation email sent successfully.";
+    } catch (Exception $e) {
+        error_log("PHPMailer Error in " . __FILE__ . " for " . $recipient_email . ": " . $mail->ErrorInfo . " (Details: " . $e->getMessage() . ")");
+        // Set a generic error message for the user, but log the detailed one.
+        $email_send_error_message = ' User account created, but could not send activation email. Please contact support or use the link below for activation.';
+        $_SESSION['success_message'] = "User account for " . htmlspecialchars($recipient_name) . " (Username: " . htmlspecialchars($username) . ") created." . $email_send_error_message . " Activation link for testing: " . $activation_link;
+    }
+
+    // TODO: Implement actual SMS sending (if applicable).
+    // $sms_message = "Activate your account for " . (APP_NAME ?? 'SACCO') . " using this link: " . $activation_link;
+    // error_log("Activation SMS for " . $member['phone'] . ": " . $sms_message); // Log for now
+
 
 } catch (PDOException $e) {
     if ($pdo->inTransaction()) {
