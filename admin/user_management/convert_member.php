@@ -87,11 +87,12 @@ try {
 
     // 3. Insert into users table
     $sql_insert_user = "INSERT INTO users (member_id, username, password_hash, email, phone, is_active, activation_token, token_expires_at, created_at, updated_at)
-                        VALUES (:member_id, :username, NULL, :email, :phone, 0, :activation_token, :token_expires_at, NOW(), NOW())";
+                        VALUES (:member_id, :username, :password_hash, :email, :phone, 0, :activation_token, :token_expires_at, NOW(), NOW())"; // Changed NULL to :password_hash
     $stmt_insert_user = $pdo->prepare($sql_insert_user);
     $stmt_insert_user->execute([
         'member_id' => $member['id'],
         'username' => $username,
+        'password_hash' => 'PENDING_ACTIVATION_NO_LOGIN', // New placeholder value
         'email' => $member['email'],
         'phone' => $member['phone'],
         'activation_token' => $activation_token,
