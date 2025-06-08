@@ -24,7 +24,7 @@ define('DB_USER', 'root');
 define('DB_PASS', '');
 define('DB_PORT', '3306');
 define('DB_CHARSET', 'utf8mb4');         // Database charset
-define('BASE_URL', 'http://localhost/savingssystem/');
+//define('BASE_URL', 'http://localhost/savingssystem/');   ///uncomment this in dev environment
 
 
 
@@ -121,7 +121,7 @@ function formatPhoneUG($phone) {
 
 // ==================== APP CONSTANTS ====================
 define('APP_NAME', 'Rukindo Kweyamba Savings Group');
-//define('BASE_URL', 'https://' . $_SERVER['HTTP_HOST'] . '/'); // Ensure this correctly reflects your base URL, including subdirectories if any.
+define('BASE_URL', 'https://' . $_SERVER['HTTP_HOST'] . '/'); // Ensure this correctly reflects your base URL, including subdirectories if any.
 define('MAX_LOGIN_ATTEMPTS', 5);
 define('LOCKOUT_TIME', 15 * 60); // 15 minutes
 
