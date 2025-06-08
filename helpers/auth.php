@@ -1,10 +1,10 @@
 <?php
 // helpers/auth.php
 
-// Ensure session is started
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+// Session is expected to be started by config.php, which should be included before this file.
+// if (session_status() === PHP_SESSION_NONE) {
+//     session_start();
+// }
 
 /**
  * Checks if a user is logged in.

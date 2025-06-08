@@ -14,10 +14,10 @@ if (file_exists(__DIR__ . '/../config.php')) {
     }
 }
 
-// Session management (ensure it's started)
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+// Session management is now handled by config.php (included above)
+// if (session_status() === PHP_SESSION_NONE) {
+//     session_start();
+// }
 // The original script had a session_unset() if session was active.
 // This is unusual for a login page unless it's meant to force a new login, clearing old session.
 // For a typical login, you'd just ensure session is started.
@@ -37,8 +37,50 @@ if(isset($_SESSION['success_message'])) unset($_SESSION['success_message']);
 $username = '';
 
 // Check if already logged in
-if (isset($_SESSION['user']['id'])) { // Changed from admin to user
-    header("Location: ../index.php");
+if (isset($_SESSION['user']['id'])) {
+    // User is logged in, determine where to redirect them.
+    // Ensure helpers are available for has_role()
+    // config.php (included at the very top) should ideally include helpers/auth.php,
+    // or helpers/auth.php should be included before this check.
+    // Let's add a check and include here if function doesn't exist.
+    if (!function_exists('has_role')) {
+        if (file_exists(__DIR__ . '/../helpers/auth.php')) {
+            // helpers/auth.php should also ensure session_start() if not already,
+            // and include config.php if it needs BASE_URL, etc.
+            // However, config.php is already included above.
+            require_once __DIR__ . '/../helpers/auth.php';
+        } else {
+            // This is a critical problem if helpers are missing here
+            error_log("CRITICAL: helpers/auth.php not found from auth/login.php (initial redirect). Role-based redirect will fail.");
+            // Fallback to a generic redirect to prevent broken page, but this indicates a setup issue.
+            header("Location: " . rtrim($base_url, '/') . "/landing.php");
+            exit;
+        }
+    }
+
+    if (function_exists('has_role')) { // Double check has_role is now available
+        if (has_role(['Core Admin', 'Administrator'])) {
+            header("Location: " . rtrim($base_url, '/') . "/index.php"); // Admin dashboard
+        } elseif (has_role('Member')) {
+            if (isset($_SESSION['user']['member_id']) && !empty($_SESSION['user']['member_id'])) {
+                header("Location: " . rtrim($base_url, '/') . "/members/my_savings.php"); // Member dashboard
+            } else {
+                // Member role without member_id: unusual, log and redirect to a safe page
+                error_log("User ID: " . ($_SESSION['user']['id'] ?? 'Unknown') . " (in login.php initial redirect) has 'Member' role but no member_id.");
+                $_SESSION['info_message'] = "Your account setup appears incomplete. Please contact support.";
+                header("Location: " . rtrim($base_url, '/') . "/landing.php");
+            }
+        } else {
+            // Fallback for any other authenticated user with roles not explicitly handled
+            $user_roles_str = !empty($_SESSION['user']['roles']) ? implode(',', $_SESSION['user']['roles']) : 'No roles assigned';
+            error_log("User ID: " . ($_SESSION['user']['id'] ?? 'Unknown') . " (in login.php initial redirect) has unhandled roles: " . $user_roles_str);
+            $_SESSION['info_message'] = "You are already logged in."; // Generic message
+            header("Location: " . rtrim($base_url, '/') . "/landing.php"); // Default redirect
+        }
+    } else {
+        // Fallback if has_role somehow still not defined (should have been caught by error_log above)
+        header("Location: " . rtrim($base_url, '/') . "/landing.php");
+    }
     exit;
 }
 

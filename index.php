@@ -1,8 +1,19 @@
 <?php
-session_start();
+// Session is now started by config.php
+// session_start();
 
 // Verify the session file exists and is writable
+// This check might be problematic if session.save_path is not standard or accessible for direct check.
+// Consider removing if it causes issues or if server config ensures writability.
+// For now, commenting out as config.php handles session start, and this check might be too strict/problematic.
+/*
 if (!file_exists(session_save_path()) || !is_writable(session_save_path())) {
+    die('Session directory not writable: ' . session_save_path());
+}
+*/
+
+// Standardize session check
+// config.php should be included first to make BASE_URL available.
     die('Session directory not writable: ' . session_save_path());
 }
 

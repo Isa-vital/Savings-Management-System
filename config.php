@@ -11,14 +11,22 @@ error_reporting(E_ALL);
 date_default_timezone_set('Africa/Nairobi');
 
 // ==================== SECURE SESSION ====================
+if (session_status() === PHP_SESSION_NONE) {
+    // Basic session start
+    session_start();
 
-// session_start([
-//     'name' => 'SaccoSecureSession',
-//     'cookie_lifetime' => 86400,
-//     'cookie_secure' => true,
-//     'cookie_httponly' => true,
-//     'use_strict_mode' => true
-// ]);
+    // Or, for more secure options (ensure these are appropriate for your server setup):
+    /*
+    session_start([
+        'name' => 'SaccoSecureSession', // Custom session name
+        'cookie_lifetime' => 86400,    // Session cookie lifetime in seconds (1 day)
+        'cookie_secure' => isset($_SERVER['HTTPS']), // Send cookie only over HTTPS
+        'cookie_httponly' => true,     // Prevent JavaScript access to session cookie
+        'use_strict_mode' => true,     // Helps prevent session fixation
+        // 'save_path' => '/path/to/your/custom/session/save_path', // Optional: custom save path
+    ]);
+    */
+}
 
 // ==================== DATABASE (PDO POWER) ====================
 define('DB_HOST', '127.0.0.1');

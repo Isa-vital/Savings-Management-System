@@ -1,8 +1,9 @@
 <?php
 // Config, Session, and PHPMailer
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+// Session is expected to be started by config.php
+// if (session_status() === PHP_SESSION_NONE) {
+//     session_start();
+// }
 require_once __DIR__ . '/../config.php'; // Provides $pdo, BASE_URL, APP_NAME, SMTP settings etc.
 // For auth/forgot_password.php, vendor autoload is one level up
 require_once __DIR__ . '/../vendor/autoload.php';

@@ -1,6 +1,7 @@
 <?php
-// Existing PHP block at the top of sidebar.php for session_start, BASE_URL, APP_NAME, helpers/auth.php
-if (session_status() === PHP_SESSION_NONE) { session_start(); }
+// Session is expected to be started by config.php,
+// which should be included by the parent script before this sidebar partial.
+// if (session_status() === PHP_SESSION_NONE) { session_start(); }
 
 // Ensure APP_NAME is defined
 if (!defined('APP_NAME')) {
