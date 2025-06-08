@@ -27,7 +27,7 @@ if (!defined('BASE_URL')) {
     // Try to guess if inside 'savingssystem' subdirectory
     $uri_path = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH);
     $path_parts = explode('/', trim($uri_path, '/'));
-    
+
     $base_path_segment = '';
     // A common pattern is the project being in a subdirectory like '/savingssystem/'
     // This is a heuristic and might need adjustment for other structures.
@@ -45,7 +45,7 @@ if (!defined('BASE_URL')) {
             $base_path_segment = '/'; // Default to root if no clear segment found
         }
     }
-    
+
     define('BASE_URL', $protocol . $host . rtrim($base_path_segment, '/') . '/');
 }
 ?>

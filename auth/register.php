@@ -1,10 +1,14 @@
 <?php
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\SMTP;
+use PHPMailer\PHPMailer\Exception;
+
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 require_once __DIR__ . '/../config.php'; // For $pdo, BASE_URL, helper functions
-// helpers/auth.php might be included if CSRF functions are there, but config.php should have them based on previous context.
-// If generateToken/validateToken are not in config.php, include helpers/auth.php. Assuming they are in config.php for now.
+// For auth/register.php, vendor autoload is one level up
+require_once __DIR__ . '/../vendor/autoload.php';
 
 $errors = [];
 $success_message = $_SESSION['success_message'] ?? null;
@@ -123,15 +127,63 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 $pdo->commit();
 
-                // Simulate sending activation email
+                // Send activation email
                 $activation_link = rtrim(BASE_URL ?? '', '/') . '/auth/activate_account.php?token=' . $activation_token;
-                // TODO: Implement actual email sending
-                $email_subject = "Activate Your Account - " . (APP_NAME ?? 'Our SACCO');
-                $email_body = "Dear " . htmlspecialchars($full_name) . ",\n\nThank you for registering. Please click the link below to activate your account:\n" . $activation_link . "\n\nThis link will expire in 24 hours.\n\nRegards,\n" . (APP_NAME ?? 'The Team');
-                error_log("Activation Email for " . $email . ": Subject: " . $email_subject . " Body: " . $email_body);
+                $email_send_error_message = '';
 
+                $mail = new PHPMailer(true);
+                try {
+                    //Server settings from config.php
+                    $mail->SMTPDebug = SMTP::DEBUG_OFF; // Use SMTP::DEBUG_SERVER for debugging
+                    $mail->isSMTP();
+                    $mail->Host       = SMTP_HOST;
+                    $mail->SMTPAuth   = true;
+                    $mail->Username   = SMTP_USERNAME;
+                    $mail->Password   = SMTP_PASSWORD;
 
-                $_SESSION['success_message'] = "Registration successful! Please check your email (".htmlspecialchars($email).") to activate your account. Activation link for testing: " . $activation_link;
+                    if (defined('SMTP_ENCRYPTION') && SMTP_ENCRYPTION === 'tls') {
+                        $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+                    } elseif (defined('SMTP_ENCRYPTION') && SMTP_ENCRYPTION === 'ssl') {
+                        $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
+                    }
+
+                    $mail->Port       = SMTP_PORT;
+
+                    //Recipients
+                    $recipient_email = $email; // User's email from form
+                    $recipient_name = $full_name; // User's full name from form
+                    $mail->setFrom(MAIL_FROM_EMAIL, MAIL_FROM_NAME);
+                    $mail->addAddress($recipient_email, $recipient_name);
+
+                    // Content
+                    $mail->isHTML(true);
+                    $mail->Subject = 'Activate Your ' . (APP_NAME ?? 'SACCO') . ' Account';
+
+                    $email_body_html = "Hello " . htmlspecialchars($recipient_name) . ",<br><br>";
+                    $email_body_html .= "Thank you for registering with " . (APP_NAME ?? 'Our Platform') . ".<br>";
+                    $email_body_html .= "Please click the link below to activate your account:<br>";
+                    $email_body_html .= "<a href='" . $activation_link . "'>" . $activation_link . "</a><br><br>";
+                    $email_body_html .= "This link will expire in 24 hours.<br><br>";
+                    $email_body_html .= "Regards,<br>The " . (APP_NAME ?? 'SACCO') . " Team";
+
+                    $alt_email_body = "Hello " . htmlspecialchars($recipient_name) . ",\n\n";
+                    $alt_email_body .= "Thank you for registering with " . (APP_NAME ?? 'Our Platform') . ".\n";
+                    $alt_email_body .= "Please copy and paste the following link into your browser to activate your account:\n";
+                    $alt_email_body .= $activation_link . "\n\n";
+                    $alt_email_body .= "This link will expire in 24 hours.\n\n";
+                    $alt_email_body .= "Regards,\nThe " . (APP_NAME ?? 'SACCO') . " Team";
+
+                    $mail->Body = $email_body_html;
+                    $mail->AltBody = $alt_email_body;
+
+                    $mail->send();
+                    $_SESSION['success_message'] = "Registration successful! An activation email has been sent to ".htmlspecialchars($email).". Please check your inbox (and spam folder).";
+                } catch (Exception $e) {
+                    error_log("PHPMailer Error in " . __FILE__ . " for " . $recipient_email . ": " . $mail->ErrorInfo . " (Details: " . $e->getMessage() . ")");
+                    // Fallback: provide activation link in success message if email fails
+                    $_SESSION['success_message'] = "Registration successful! We couldn't send an activation email (Error: " . htmlspecialchars($mail->ErrorInfo) . "). Please use this link to activate: " . $activation_link;
+                }
+
                 header('Location: login.php');
                 exit();
 

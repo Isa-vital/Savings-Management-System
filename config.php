@@ -24,6 +24,8 @@ define('DB_USER', 'root');
 define('DB_PASS', '');
 define('DB_PORT', '3306');
 define('DB_CHARSET', 'utf8mb4');         // Database charset
+define('BASE_URL', 'http://localhost/savingssystem/');
+
 
 
 try {
@@ -119,19 +121,37 @@ function formatPhoneUG($phone) {
 
 // ==================== APP CONSTANTS ====================
 define('APP_NAME', 'Rukindo Kweyamba Savings Group');
-define('APP_VERSION', '1.0.1');
-define('APP_AUTHOR', 'Group 18');
-$protocol = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? "https" : "http";
-$host = isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : 'localhost';
-define('APP_URL', $protocol . '://' . $host . '/savings_mgt_system');
-
+//define('BASE_URL', 'https://' . $_SERVER['HTTP_HOST'] . '/'); // Ensure this correctly reflects your base URL, including subdirectories if any.
 define('MAX_LOGIN_ATTEMPTS', 5);
 define('LOCKOUT_TIME', 15 * 60); // 15 minutes
-define('SMTP_HOST', 'smtp.mailtrap.io');
-define('SMTP_USER', 'your_mailtrap_username');
-define('SMTP_PASS', 'your_mailtrap_password');
-define('SMTP_PORT', 2525);
-define('SMTP_SECURE', 'tls');
+
+
+// ==================== EMAIL (PHPMailer SMTP) SETTINGS ====================
+// --- IMPORTANT: Fill these placeholders with your actual SMTP credentials ---
+define('SMTP_HOST', 'smtp.gmail.com'); // e.g., 'smtp.gmail.com' or your hosting provider's SMTP server
+define('SMTP_USERNAME', 'isaacvital44@gmail.com');    // Your SMTP username (often your email address)
+define('SMTP_PASSWORD', 'kpgt iiqs xhhh dsie');                // Your SMTP password (or app-specific password)
+define('SMTP_PORT', 587);                                 // SMTP port (e.g., 587 for TLS, 465 for SSL, 25 for unencrypted)
+define('SMTP_ENCRYPTION', 'tls');                         // SMTP encryption: 'tls' (recommended), 'ssl', or false for none
+                                                          // For PHPMailer, this translates to:
+                                                          // 'tls' -> PHPMailer::ENCRYPTION_STARTTLS
+                                                          // 'ssl' -> PHPMailer::ENCRYPTION_SMTPS
+                                                          // false -> $mail->SMTPSecure = false; (though might still use opportunistic TLS)
+
+define('MAIL_FROM_EMAIL', 'isaacvital44@gmail.com');      // The email address system emails will be sent from
+define('MAIL_FROM_NAME', (defined('APP_NAME') ? APP_NAME : 'Savings App') . ' Support'); // Uses APP_NAME if defined
+
+// --- PHPMailer Path ---
+// If you installed PHPMailer via Composer, this should be all you need in scripts that send email:
+// require_once __DIR__ . '/vendor/autoload.php';
+//
+// If you've manually downloaded PHPMailer, you might need to define paths to its classes,
+// or include them directly in the scripts. For now, we'll assume Composer / autoloading.
+// Example for manual include (less common now):
+// define('PHPMAILER_PATH_PHPMAILER', __DIR__ . '/path/to/phpmailer/src/PHPMailer.php');
+// define('PHPMAILER_PATH_SMTP', __DIR__ . '/path/to/phpmailer/src/SMTP.php');
+// define('PHPMAILER_PATH_EXCEPTION', __DIR__ . '/path/to/phpmailer/src/Exception.php');
+
 
 // ==================== AUTO-CLOSE CONNECTION ====================
 register_shutdown_function(function() {
