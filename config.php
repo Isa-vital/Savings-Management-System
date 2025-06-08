@@ -127,6 +127,11 @@ define('APP_URL', $protocol . '://' . $host . '/savings_mgt_system');
 
 define('MAX_LOGIN_ATTEMPTS', 5);
 define('LOCKOUT_TIME', 15 * 60); // 15 minutes
+define('SMTP_HOST', 'smtp.mailtrap.io');
+define('SMTP_USER', 'your_mailtrap_username');
+define('SMTP_PASS', 'your_mailtrap_password');
+define('SMTP_PORT', 2525);
+define('SMTP_SECURE', 'tls');
 
 // ==================== AUTO-CLOSE CONNECTION ====================
 register_shutdown_function(function() {

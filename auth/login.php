@@ -8,7 +8,7 @@ if (file_exists(__DIR__ . '/../config.php')) {
     if (defined('APP_NAME')) {
         $app_name = APP_NAME;
     }
-    if (defined('BASE_URL')) { 
+    if (defined('BASE_URL')) {
         $base_url = BASE_URL; // Assuming BASE_URL ends with a slash
     }
 }
@@ -17,7 +17,7 @@ if (file_exists(__DIR__ . '/../config.php')) {
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
-// The original script had a session_unset() if session was active. 
+// The original script had a session_unset() if session was active.
 // This is unusual for a login page unless it's meant to force a new login, clearing old session.
 // For a typical login, you'd just ensure session is started.
 // If the goal was to clear a previous user's session before a new login attempt,
@@ -117,7 +117,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             align-items: center;
             justify-content: center;
             min-height: 100vh;
-            background-color: #f0f2f5; 
+            background-color: #f0f2f5;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
         .login-container {
@@ -142,9 +142,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             color: #007bff;
         }
         .login-card {
-            border: none; 
-            border-radius: 0.75rem; 
-            box-shadow: 0 4px 25px rgba(0,0,0,0.1); 
+            border: none;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 25px rgba(0,0,0,0.1);
             padding: 2rem; /* More padding inside card */
         }
         .form-control {
@@ -152,7 +152,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             padding: 0.75rem 1rem;
             margin-bottom: 1rem; /* Space between inputs */
         }
-        .btn-primary { 
+        .btn-primary {
             border-radius: 0.5rem;
             padding: 0.75rem 1.5rem;
             font-weight: 600;
@@ -172,7 +172,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             font-size: 0.9em;
         }
         .login-footer a {
-            color: #007bff; 
+            color: #007bff;
             text-decoration: none;
         }
         .login-footer a:hover {
@@ -215,9 +215,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         </div>
         <div class="login-footer">
             <p>Don't have an account? <a href="<?php echo rtrim($base_url, '/'); ?>/auth/register.php">Sign Up</a></p>
-            <p class="text-muted">&copy; <?php echo date("Y"); ?> <?php echo htmlspecialchars($app_name); ?></p>
         </div>
     </div>
+    <!-- Footer -->
+   
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 </body>
+
 </html>

@@ -36,6 +36,7 @@ if (file_exists(__DIR__ . '/config.php')) {
         body { padding-top: 56px; /* Adjusted for fixed-top navbar */ }
         .hero-section {
             background: url('https://images.unsplash.com/photo-1579621970795-87facc2f976d?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1200&q=80') center center/cover no-repeat;
+            background-blend-mode: darken;
             color: white;
             padding: 8rem 0;
             text-align: center;
@@ -86,7 +87,7 @@ if (file_exists(__DIR__ . '/config.php')) {
             <h1>Secure Your Future, Save With Us</h1>
             <p class="lead">Join thousands of members who are building a brighter financial future through disciplined savings and accessible credit with <?php echo htmlspecialchars($app_name); ?>.</p>
             <a href="<?php echo rtrim($base_url, '/'); ?>/auth/register.php" class="btn btn-lg btn-success me-2">Sign Up Now</a>
-            <a href="#features" class="btn btn-lg btn-outline-light">Learn More</a>
+            <a href="<?php echo rtrim($base_url, '/'); ?>/auth/login.php" class="btn btn-lg btn-outline-light">Login</a>
         </div>
     </section>
 
@@ -99,19 +100,19 @@ if (file_exists(__DIR__ . '/config.php')) {
                     <i class="fas fa-piggy-bank feature-icon"></i>
                     <h3>Easy Savings Management</h3>
                     <p>Track your savings, view statements, and manage your account with ease through our user-friendly platform.</p>
-                    <img src="https://images.unsplash.com/photo-1593693309998-bcc08154c750?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=300&q=80" class="img-fluid rounded mt-2" alt="Piggy bank representing easy savings">
+                    <img src="assets/uploads/easy saavings.jpg" class="img-fluid rounded mt-2" alt="Piggy bank representing easy savings">
                 </div>
                 <div class="col-md-4 feature-item">
                     <i class="fas fa-hand-holding-usd feature-icon"></i>
                     <h3>Accessible Loans</h3>
                     <p>Get access to affordable loan products when you need them, with transparent terms and fair rates.</p>
-                    <img src="https://images.unsplash.com/photo-1550751827-41378cb4f4dd?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=300&q=80" class="img-fluid rounded mt-2" alt="Abstract security lock">
+                    <img src="assets/uploads/loan.jpg" class="img-fluid rounded mt-2" alt="Abstract security lock">
                 </div>
                 <div class="col-md-4 feature-item">
                     <i class="fas fa-shield-alt feature-icon"></i>
                     <h3>Secure & Transparent</h3>
                     <p>Your funds and data are secure with us. We operate with utmost transparency and accountability.</p>
-                    <img src="https://images.unsplash.com/photo-1531206715517-5c0ba140b2b8?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=300&q=80" class="img-fluid rounded mt-2" alt="Diverse group of people representing community">
+                    <img src="assets/uploads/seecure.jpg" class="img-fluid rounded mt-2" alt="Diverse group of people representing community">
                 </div>
             </div>
         </div>
@@ -126,7 +127,7 @@ if (file_exists(__DIR__ . '/config.php')) {
                     <div class="p-3 border rounded shadow-sm">
                         <div class="display-4 text-primary mb-2">1</div>
                         <h4>Sign Up</h4>
-                        <p>Create your account in minutes.</p>
+                        <p>Register with us to get started</p>
                     </div>
                 </div>
                 <div class="col-md-4 mb-3">
@@ -146,18 +147,8 @@ if (file_exists(__DIR__ . '/config.php')) {
             </div>
         </div>
     </section>
-
-
     <!-- Footer -->
-    <footer class="footer">
-        <div class="container">
-            <p class="mb-1">&copy; <?php echo date("Y"); ?> <?php echo htmlspecialchars($app_name); ?>. All Rights Reserved.</p>
-            <ul class="list-inline">
-                <li class="list-inline-item"><a href="#">Privacy Policy</a></li>
-                <li class="list-inline-item"><a href="#">Terms of Service</a></li>
-            </ul>
-        </div>
-    </footer>
+     <?php require_once 'partials/footer.php'; ?>
 
     <!-- Bootstrap JS Bundle CDN -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>

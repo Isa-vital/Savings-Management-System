@@ -1,6 +1,10 @@
 <?php
 require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../../helpers/auth.php';
+require_once __DIR__ . '/../../vendor/autoload.php'; // Load Composer autoloader
+
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\Exception;
 
 require_admin(); // Core Admin or Administrator
 
@@ -36,8 +40,8 @@ try {
     }
 
     if (empty($member['email'])) {
-        $_SESSION['error_message'] = "Member does not have an email address, which is required to create a user account. Please update the member's details first.";
-        header('Location: index.php'); // Or redirect to member edit page: ../../members/edit.php?id=$member_id
+        $_SESSION['error_message'] = "Member does not have an email address, which is required to create a user account.";
+        header('Location: index.php');
         exit();
     }
 
@@ -49,7 +53,6 @@ try {
         header('Location: index.php');
         exit();
     }
-
 
     // User Creation Logic
     $pdo->beginTransaction();
@@ -63,18 +66,18 @@ try {
         $stmt_user = $pdo->prepare("SELECT id FROM users WHERE username = :username");
         $stmt_user->execute(['username' => $username]);
         if (!$stmt_user->fetch()) {
-            break; // Unique username found
+            break;
         }
         $username = $base_username . $counter;
         $counter++;
-        if ($counter > 100) { // Safety break
+        if ($counter > 100) {
             throw new Exception("Could not generate a unique username after 100 attempts.");
         }
     }
 
     // 2. Generate activation token
     $activation_token = bin2hex(random_bytes(32));
-    $token_expires_at = date('Y-m-d H:i:s', time() + (24 * 60 * 60)); // 24 hours
+    $token_expires_at = date('Y-m-d H:i:s', time() + (24 * 60 * 60));
 
     // 3. Insert into users table
     $sql_insert_user = "INSERT INTO users (member_id, username, password_hash, email, phone, is_active, activation_token, token_expires_at, created_at, updated_at)
@@ -97,35 +100,59 @@ try {
 
     $pdo->commit();
 
-    // 5. Notifications (Simulated)
+    // 5. Send activation email with PHPMailer
     $activation_link = rtrim(BASE_URL ?? '', '/') . '/auth/activate_account.php?token=' . $activation_token;
+    
+    $mail = new PHPMailer(true);
+    try {
+        // Server settings (configure these in your config.php)
+        $mail->isSMTP();
+        $mail->Host = defined('SMTP_HOST') ? SMTP_HOST : 'smtp.mailtrap.io';
+        $mail->SMTPAuth = true;
+        $mail->Username = defined('SMTP_USER') ? SMTP_USER : 'your_mailtrap_username';
+        $mail->Password = defined('SMTP_PASS') ? SMTP_PASS : 'your_mailtrap_password';
+        $mail->SMTPSecure = defined('SMTP_SECURE') ? SMTP_SECURE : PHPMailer::ENCRYPTION_STARTTLS;
+        $mail->Port = defined('SMTP_PORT') ? SMTP_PORT : 2525;
 
-    // TODO: Implement actual email sending.
-    // For now, we can store it in a session variable for testing/display if needed, or log it.
-    $email_message = "Dear " . htmlspecialchars($member['full_name']) . ",\n\nPlease click the following link to activate your account and set your password:\n" . $activation_link . "\n\nThis link will expire in 24 hours.\n\nRegards,\n" . ($settings['site_name'] ?? APP_NAME);
-    error_log("Activation Email for " . $member['email'] . ": " . $email_message); // Log for now
-    // mail($member['email'], "Activate Your Account - " . ($settings['site_name'] ?? APP_NAME), $email_message);
+        // Recipients
+        $mail->setFrom('no-reply@yoursavingssystem.com', 'Savings System');
+        $mail->addAddress($member['email'], $member['full_name']);
 
-    // TODO: Implement actual SMS sending.
-    $sms_message = "Activate your account for " . ($settings['site_name'] ?? APP_NAME) . " using this link: " . $activation_link;
-    error_log("Activation SMS for " . $member['phone'] . ": " . $sms_message); // Log for now
+        // Content
+        $mail->isHTML(true);
+        $mail->Subject = 'Activate Your Account';
+        $mail->Body = '
+            <h2>Welcome to Our Savings System</h2>
+            <p>Dear ' . htmlspecialchars($member['full_name']) . ',</p>
+            <p>An account has been created for you. Please click the button below to activate your account and set your password:</p>
+            <p><a href="' . $activation_link . '" style="background-color: #4CAF50; color: white; padding: 10px 20px; text-align: center; text-decoration: none; display: inline-block; border-radius: 5px;">Activate Account</a></p>
+            <p>This link will expire in 24 hours.</p>
+            <p>If you didn\'t request this, please ignore this email.</p>
+        ';
+        $mail->AltBody = "Dear " . $member['full_name'] . ",\n\nPlease click the following link to activate your account:\n" . $activation_link . "\n\nThis link will expire in 24 hours.";
 
-    $_SESSION['success_message'] = "User account creation initiated for " . htmlspecialchars($member['full_name']) . " (Username: " . htmlspecialchars($username) . "). An activation link has been (notionally) sent to their email and phone. Activation link for testing: " . $activation_link;
+        $mail->send();
+        
+        $_SESSION['success_message'] = "User account created for " . htmlspecialchars($member['full_name']) . " (Username: " . htmlspecialchars($username) . "). Activation email sent successfully!";
+    } catch (Exception $e) {
+        error_log("Mailer Error: " . $mail->ErrorInfo);
+        $_SESSION['success_message'] = "User account created but email could not be sent. Mailer Error: " . $mail->ErrorInfo;
+        // Still show success because account was created, just email failed
+    }
 
 } catch (PDOException $e) {
     if ($pdo->inTransaction()) {
         $pdo->rollBack();
     }
     $_SESSION['error_message'] = "Database error during user conversion: " . $e->getMessage();
-    error_log("User Conversion PDOException for member_id " . $member_id . ": " . $e->getMessage());
+    error_log("User Conversion PDOException: " . $e->getMessage());
 } catch (Exception $e) {
     if ($pdo->inTransaction()) {
         $pdo->rollBack();
     }
     $_SESSION['error_message'] = "Error during user conversion: " . $e->getMessage();
-    error_log("User Conversion Exception for member_id " . $member_id . ": " . $e->getMessage());
+    error_log("User Conversion Exception: " . $e->getMessage());
 }
 
 header('Location: index.php');
 exit();
-?>

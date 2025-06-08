@@ -8,7 +8,7 @@ if (!file_exists(session_save_path()) || !is_writable(session_save_path())) {
 
 // Standardize session check
 // config.php should be included first to make BASE_URL available.
-require_once __DIR__ . '/config.php'; 
+require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/helpers/auth.php'; // Include the new auth helpers
 
 // Ensure BASE_URL is defined, with a fallback if necessary (though config.php should handle this)
@@ -17,9 +17,9 @@ if (!defined('BASE_URL')) {
     $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' || $_SERVER['SERVER_PORT'] == 443) ? "https://" : "http://";
     $host = $_SERVER['HTTP_HOST'];
     $script_name = $_SERVER['SCRIPT_NAME']; // e.g., /savingsapp/index.php
-    $base_path = rtrim(dirname($script_name), '/\\'); 
-    if ($base_path === '' || $base_path === $script_name) { 
-        $base_path = ''; 
+    $base_path = rtrim(dirname($script_name), '/\\');
+    if ($base_path === '' || $base_path === $script_name) {
+        $base_path = '';
     }
     define('BASE_URL', $protocol . $host . $base_path . '/');
 }
@@ -28,7 +28,7 @@ if (!defined('BASE_URL')) {
 if (!isset($_SESSION['user']['id'])) { // Check the new session structure
     // Redirect to landing page if not logged in, as login page is for explicit login action.
     // Or, redirect to login page if that's preferred flow. Landing page seems more user-friendly.
-    header("Location: " . BASE_URL . "landing.php"); 
+    header("Location: " . BASE_URL . "landing.php");
     exit;
 }
 
