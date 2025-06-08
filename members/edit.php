@@ -1,5 +1,6 @@
 <?php
-session_start(); 
+// Session is expected to be started by config.php
+// session_start();
 
 require_once __DIR__ . '/../config.php';      // For $pdo, BASE_URL, APP_NAME, sanitize()
 require_once __DIR__ . '/../helpers/auth.php'; // For require_login(), has_role()

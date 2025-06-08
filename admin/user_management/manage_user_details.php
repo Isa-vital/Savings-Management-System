@@ -1,8 +1,8 @@
 <?php
-// Ensure session is started
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+// Session is expected to be started by config.php
+// if (session_status() === PHP_SESSION_NONE) {
+//     session_start();
+// }
 
 // Includes - config.php should be first to define BASE_URL etc.
 require_once __DIR__ . '/../../config.php';

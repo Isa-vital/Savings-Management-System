@@ -1,7 +1,9 @@
 <?php
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+// Session is expected to be started by config.php,
+// which should be included by the parent script before this navbar partial.
+// if (session_status() === PHP_SESSION_NONE) {
+//     session_start();
+// }
 
 // Attempt to include config.php if not already done by parent script
 // This is tricky because the path to config.php varies based on the including file's location.
