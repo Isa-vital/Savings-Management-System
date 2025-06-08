@@ -1,14 +1,23 @@
 <?php
 session_start();
-require_once __DIR__ . '/config.php';
-require_once __DIR__ . '/includes/database.php';
+require_once __DIR__ . '/config.php'; // Ensures $pdo, BASE_URL, APP_NAME
+require_once __DIR__ . '/helpers/auth.php'; // For require_login, has_role
 
-if (!isset($_SESSION['admin']['id'])) {
-    header("Location: /savingssystem/auth/login.php");
+require_login(); // Ensures user is logged in, redirects to login if not.
+
+// Role check: Reports should be for admins
+if (!has_role(['Core Admin', 'Administrator'])) {
+    $_SESSION['error_message'] = "You do not have permission to view reports.";
+    // Redirect to a safe page, like user's dashboard or landing page
+    if (has_role('Member') && isset($_SESSION['user']['member_id'])) {
+        header("Location: " . BASE_URL . "members/my_savings.php");
+    } else {
+        header("Location: " . BASE_URL . "landing.php");
+    }
     exit;
 }
 
-$pdo = $conn;
+// $pdo is already available from config.php
 $members = [];
 $transactions = [];
 
@@ -52,12 +61,15 @@ try {
 ?>
 
 
+<!-- Navbar should be included for consistent layout -->
+<?php include __DIR__ . '/partials/navbar.php'; ?>
+
 <div class="container-fluid">
     <div class="row">
-        <?php include '..savingssystem/partials/sidebar.php'; ?>
+        <?php include __DIR__ . '/partials/sidebar.php'; ?>
 
         <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
-            <h2 class="mb-4"><i class="fas fa-chart-line me-2"></i>Reports</h2>
+            <h2 class="mb-4"><i class="fas fa-chart-line me-2"></i>Financial Reports</h2>
 
             <!-- Filters -->
             <form class="row g-3 mb-4" method="GET">
@@ -137,8 +149,16 @@ try {
 <script>
     document.getElementById("downloadPDF").addEventListener("click", () => {
         const element = document.getElementById("reportTable");
-        html2pdf().from(element).save("member_report.pdf");
+        const reportTitle = "Financial_Report_<?= date('Y-m-d') ?>";
+        const opt = {
+            margin:       0.5,
+            filename:     reportTitle + '.pdf',
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  { scale: 2 },
+            jsPDF:        { unit: 'in', format: 'letter', orientation: 'landscape' }
+        };
+        html2pdf().from(element).set(opt).save();
     });
 </script>
 
-<?php include '../partials/footer.php'; ?>
+<?php include __DIR__ . '/partials/footer.php'; ?>
