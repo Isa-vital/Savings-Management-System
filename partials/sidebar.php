@@ -1,78 +1,115 @@
 <?php
-// Ensure session is started (might be redundant if already started by including script)
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-// Make sure helpers are available for role checks
-// Assuming config.php (which defines BASE_URL) is loaded by the parent script including this sidebar.
-// If not, it would need: require_once __DIR__ . '/../config.php';
-require_once __DIR__ . '/../helpers/auth.php'; 
+// Existing PHP block at the top of sidebar.php for session_start, BASE_URL, APP_NAME, helpers/auth.php
+if (session_status() === PHP_SESSION_NONE) { session_start(); }
 
-// Define BASE_URL if not already defined (fallback, ideally set in config.php)
-if (!defined('BASE_URL')) {
-    // This is a fallback. Adjust if your structure is different or BASE_URL is guaranteed by config.php
-    // Example: Detect if running in 'savingssystem' subdirectory.
-    $script_name_parts = explode('/', $_SERVER['SCRIPT_NAME']);
-    $sub_dir_index = array_search('savingssystem', $script_name_parts);
-    if ($sub_dir_index !== false) {
-        $base_path_parts = array_slice($script_name_parts, 0, $sub_dir_index + 1);
-        $calculated_base_url = implode('/', $base_path_parts) . '/';
-    } else {
-        $calculated_base_url = '/'; // Or some other sensible default
+// Ensure APP_NAME is defined
+if (!defined('APP_NAME')) {
+    if (file_exists(__DIR__ . '/../config.php')) {
+        @include_once __DIR__ . '/../config.php'; // Try to load from parent of partials
     }
-    define('BASE_URL', $calculated_base_url);
+    if (!defined('APP_NAME')) { // If still not defined after include attempt
+        define('APP_NAME', 'Savings App'); // Absolute fallback
+    }
 }
 
+// Ensure BASE_URL is defined
+if (!defined('BASE_URL')) {
+    // Fallback for BASE_URL. This is a simplified version.
+    // A robust version should ideally be in config.php and correctly set for the environment.
+    $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' || $_SERVER['SERVER_PORT'] == 443) ? "https://" : "http://";
+    $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+    $script_name = $_SERVER['SCRIPT_NAME'] ?? '';
+    $base_path_segment = '/'; // Default
+    if (preg_match('/^(\/[^\/]+\/)/', $script_name, $matches)) {
+         // If script_name starts with /somedir/ and is not in admin or auth, assume somedir is project root
+        if (strpos($script_name, '/admin/') === false && strpos($script_name, '/auth/') === false && strpos($script_name, '/members/') === false ) {
+             $base_path_segment = $matches[1];
+        } else if (preg_match('/^(\/.*?\/)(admin|auth|members|savings|loans|partials)\//', $script_name, $sub_matches)) {
+            // If in a known subdir, take the part before it as base.
+            $base_path_segment = $sub_matches[1];
+        } else {
+             $base_path_segment = rtrim(dirname($script_name), '/\\');
+             // Go up if in 'partials' or similar common subfolder for includes
+             if(basename($base_path_segment) === 'partials') $base_path_segment = dirname($base_path_segment);
+             $base_path_segment = rtrim($base_path_segment, '/\\') . '/';
+        }
+    }
+    if ($base_path_segment === '//') $base_path_segment = '/';
+    define('BASE_URL', $protocol . $host . rtrim($base_path_segment, '/') . '/');
+}
+
+
+// Ensure helpers/auth.php is loaded for has_role() and is_logged_in()
+if (!function_exists('has_role') || !function_exists('is_logged_in')) {
+    if(file_exists(__DIR__ . '/../helpers/auth.php')) {
+        require_once __DIR__ . '/../helpers/auth.php';
+    } elseif (file_exists(__DIR__ . '/helpers/auth.php')) {
+        require_once __DIR__ . '/helpers/auth.php';
+    } else {
+        // Define dummy functions if helpers are absolutely missing to prevent fatal errors in sidebar rendering
+        if (!function_exists('is_logged_in')) { function is_logged_in_sidebar_fallback() { return isset($_SESSION['user']['id']); } }
+        if (!function_exists('has_role')) { function has_role($roles) {
+            if (!isset($_SESSION['user']['roles']) || !is_array($_SESSION['user']['roles'])) return false;
+            if (is_string($roles)) $roles = [$roles];
+            foreach($roles as $role) { if(in_array($role, $_SESSION['user']['roles'])) return true;}
+            return false;
+        }}
+    }
+}
+$is_logged_in_user = function_exists('is_logged_in') ? is_logged_in() : (function_exists('is_logged_in_sidebar_fallback') ? is_logged_in_sidebar_fallback() : false);
 ?>
-<div class="col-md-3 col-lg-2 d-md-block bg-light sidebar collapse">
+
+<nav id="sidebar" class="col-md-3 col-lg-2 d-md-block bg-light sidebar collapse">
     <div class="position-sticky pt-3">
         <ul class="nav flex-column">
-            <li class="nav-item">
-                <a class="nav-link active fw-bold" href="<?php echo BASE_URL; ?>index.php">
-                    <i class="fas fa-tachometer-alt me-2"></i>Dashboard
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link active fw-bold" href="<?php echo BASE_URL; ?>overview.php">
-                    <i class="fas fa-tachometer-alt me-2"></i>Stat Overview
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link fw-bold" href="<?php echo BASE_URL; ?>members/memberslist.php">
-                    <i class="fas fa-users me-2"></i>Group Members
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link fw-bold" href="<?php echo BASE_URL; ?>savings/savingslist.php">
-                    <i class="fas fa-wallet me-2"></i>Manage Savings
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link fw-bold" href="<?php echo BASE_URL; ?>loans/loanslist.php">
-                    <i class="fas fa-hand-holding-usd me-2"></i>Manage Loans
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link fw-bold" href="<?php echo BASE_URL; ?>reports.php">
-                    <i class="fas fa-chart-bar me-2"></i>Reports
-                </a>
-            </li>
 
-            <!-- Administration Section Dropdown -->
-            <?php
-            // Determine if any admin links should be shown, to display the Administration dropdown itself
-            if (is_logged_in()) { // Check if logged in first
+            <?php if ($is_logged_in_user): ?>
+                <?php // CORE ADMIN AND ADMINISTRATOR SHARED ITEMS (Main Dashboard) ?>
+                <?php if (has_role(['Core Admin', 'Administrator'])): ?>
+                    <li class="nav-item">
+                        <a class="nav-link active" aria-current="page" href="<?php echo htmlspecialchars(BASE_URL . 'index.php'); ?>">
+                            <i class="fas fa-tachometer-alt me-2"></i> Dashboard
+                        </a>
+                    </li>
+                     <li class="nav-item">
+                        <a class="nav-link" href="<?php echo htmlspecialchars(BASE_URL . 'overview.php'); ?>">
+                             <i class="fas fa-chart-pie me-2"></i> Stat Overview
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="<?php echo htmlspecialchars(BASE_URL . 'members/memberslist.php'); ?>">
+                             <i class="fas fa-users me-2"></i> All Members
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="<?php echo htmlspecialchars(BASE_URL . 'savings/savingslist.php'); ?>">
+                             <i class="fas fa-piggy-bank me-2"></i> All Savings
+                        </a>
+                    </li>
+                     <li class="nav-item">
+                        <a class="nav-link" href="<?php echo htmlspecialchars(BASE_URL . 'loans/loanslist.php'); ?>">
+                             <i class="fas fa-hand-holding-usd me-2"></i> All Loans
+                        </a>
+                    </li>
+                     <li class="nav-item">
+                        <a class="nav-link" href="<?php echo htmlspecialchars(BASE_URL . 'reports.php'); ?>">
+                            <i class="fas fa-chart-bar me-2"></i> Reports
+                        </a>
+                    </li>
+                    <!-- Removed transactions.php as it's not explicitly created -->
+                <?php endif; ?>
+
+                <?php // ADMINISTRATION DROPDOWN ?>
+                <?php
                 $can_see_system_settings = has_role('Core Admin');
                 $can_see_user_management = has_role(['Core Admin', 'Administrator']);
-                $can_see_group_management = has_role('Core Admin'); // Group management itself and assigning users often Core Admin
+                $can_see_group_management = has_role('Core Admin');
 
                 if ($can_see_system_settings || $can_see_user_management || $can_see_group_management) :
                 ?>
                     <li class="nav-item">
                         <a class="nav-link fw-bold d-flex justify-content-between align-items-center" href="#adminSubmenu" data-bs-toggle="collapse" role="button" aria-expanded="false" aria-controls="adminSubmenu">
-                            <span>
-                                <i class="fas fa-shield-alt me-2"></i> Administration
-                            </span>
+                            <span><i class="fas fa-shield-alt me-2"></i> Administration</span>
                             <i class="fas fa-chevron-down small"></i>
                         </a>
                         <div class="collapse ps-3" id="adminSubmenu">
@@ -84,7 +121,6 @@ if (!defined('BASE_URL')) {
                                     </a>
                                 </li>
                                 <?php endif; ?>
-
                                 <?php if ($can_see_user_management) : ?>
                                 <li class="nav-item">
                                     <a class="nav-link" href="<?= htmlspecialchars(BASE_URL . 'admin/user_management/index.php') ?>">
@@ -92,7 +128,6 @@ if (!defined('BASE_URL')) {
                                     </a>
                                 </li>
                                 <?php endif; ?>
-
                                 <?php if ($can_see_group_management) : ?>
                                 <li class="nav-item">
                                     <a class="nav-link" href="<?= htmlspecialchars(BASE_URL . 'admin/group_management/index.php') ?>">
@@ -105,41 +140,81 @@ if (!defined('BASE_URL')) {
                                     </a>
                                 </li>
                                 <?php endif; ?>
-
                             </ul>
                         </div>
                     </li>
-                <?php
-                endif;
-            } // end is_logged_in()
-            ?>
-
-            <!-- Member Area -->
-            <?php if (is_logged_in() && isset($_SESSION['user']['member_id']) && !empty($_SESSION['user']['member_id'])): ?>
-                <li class="nav-item nav-category">
-                    <span class="nav-link disabled text-muted">Member Area</span>
-                </li>
-                <?php if (has_role('Member')): ?>
-                    <li class="nav-item">
-                        <a class="nav-link fw-bold" href="<?php echo BASE_URL; ?>members/my_savings.php">
-                            <i class="fas fa-piggy-bank me-2"></i>My Savings
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link fw-bold" href="<?php echo BASE_URL; ?>members/savings_performance.php">
-                            <i class="fas fa-chart-line me-2"></i>Savings Performance
-                        </a>
-                    </li>
-                    <!-- Add more member-specific links here, e.g., My Loans, My Profile -->
                 <?php endif; ?>
+
+
+                <?php // MEMBER SPECIFIC ITEMS ?>
+                <?php if (has_role('Member') && isset($_SESSION['user']['member_id']) && !empty($_SESSION['user']['member_id'])): ?>
+                    <li class="nav-item mt-2">
+                        <h6 class="sidebar-heading d-flex justify-content-between align-items-center px-3 mt-4 mb-1 text-muted text-uppercase">
+                            <span>Member Area</span>
+                        </h6>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="<?php echo htmlspecialchars(BASE_URL . 'members/my_savings.php'); ?>">
+                            <i class="fas fa-wallet me-2"></i> My Savings
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="<?php echo htmlspecialchars(BASE_URL . 'members/savings_performance.php'); ?>">
+                            <i class="fas fa-chart-line me-2"></i> Savings Performance
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="<?php echo htmlspecialchars(BASE_URL . 'profile.php'); // Assuming general profile page ?>">
+                            <i class="fas fa-user-edit me-2"></i> My Profile
+                        </a>
+                    </li>
+                    <!-- Add other member-specific links here, e.g., apply for loan, loan history -->
+                <?php endif; ?>
+
+                <?php // SHARED "MY PROFILE" FOR NON-MEMBER ADMINS ?>
+                 <?php if (has_role(['Core Admin', 'Administrator']) && !(has_role('Member') && isset($_SESSION['user']['member_id']) && !empty($_SESSION['user']['member_id'])) ): ?>
+                     <li class="nav-item mt-2"> <!-- Add some spacing if this is the only "personal" link for an admin -->
+                        <h6 class="sidebar-heading d-flex justify-content-between align-items-center px-3 mt-4 mb-1 text-muted text-uppercase">
+                            <span>User Account</span>
+                        </h6>
+                    </li>
+                     <li class="nav-item">
+                        <a class="nav-link" href="<?php echo htmlspecialchars(BASE_URL . 'profile.php'); ?>">
+                            <i class="fas fa-user-circle me-2"></i> My Profile
+                        </a>
+                    </li>
+                 <?php endif; ?>
+
+
+            <?php else: // Not logged in - Show minimal links ?>
+                <li class="nav-item">
+                    <a class="nav-link" href="<?php echo htmlspecialchars(BASE_URL . 'landing.php'); ?>">
+                        <i class="fas fa-home me-2"></i> Home
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="<?php echo htmlspecialchars(BASE_URL . 'auth/login.php'); ?>">
+                        <i class="fas fa-sign-in-alt me-2"></i> Login
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="<?php echo htmlspecialchars(BASE_URL . 'auth/register.php'); ?>">
+                        <i class="fas fa-user-plus me-2"></i> Sign Up
+                    </a>
+                </li>
             <?php endif; ?>
-            
-            <!-- General Settings Link (kept for now, review its purpose) -->
-            <li class="nav-item">
-                <a class="nav-link fw-bold" href="<?php echo BASE_URL; ?>profile.php"> <!-- Changed from index.php to profile.php as a more likely target -->
-                    <i class="fas fa-user-cog me-2"></i>My Profile/Settings
+
+        </ul>
+
+        <?php if ($is_logged_in_user): ?>
+        <hr>
+        <ul class="nav flex-column mb-2">
+             <li class="nav-item">
+                <a class="nav-link" href="<?php echo htmlspecialchars(BASE_URL . 'auth/logout.php'); ?>">
+                    <i class="fas fa-sign-out-alt me-2"></i> Logout
                 </a>
             </li>
         </ul>
+        <?php endif; ?>
     </div>
-</div>
+</nav>

@@ -88,9 +88,44 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         'groups' => $groups,
                         'last_activity' => time()
                     ];
+
+                    // Include helpers if has_role() is not yet available
+                    // Note: config.php (which might include helpers) is already included at the top.
+                    // This explicit include ensures it if config.php doesn't or if called directly.
+                    if (!function_exists('has_role')) {
+                        // Assuming helpers/auth.php is in ../ relative to auth/login.php
+                        if (file_exists(__DIR__ . '/../helpers/auth.php')) {
+                            require_once __DIR__ . '/../helpers/auth.php';
+                        } else {
+                            // Fallback or error if helpers essential for redirection are missing
+                            error_log("CRITICAL: helpers/auth.php not found from auth/login.php. Role-based redirect might fail.");
+                            // Default redirect to prevent broken state, or die with error.
+                            // For now, will let it try has_role and potentially fail if file truly missing and not included elsewhere.
+                        }
+                    }
+
                     session_regenerate_id(true);
-                    // Redirect to a dashboard or main page after login
-                    header("Location: " . rtrim($base_url, '/') . "/index.php");
+
+                    if (has_role(['Core Admin', 'Administrator'])) {
+                        header("Location: " . rtrim($base_url, '/') . "/index.php"); // Admin dashboard
+                    } elseif (has_role('Member')) {
+                        // Ensure member_id is set if they have Member role and are expected to see member pages
+                        if (isset($_SESSION['user']['member_id']) && !empty($_SESSION['user']['member_id'])) {
+                            header("Location: " . rtrim($base_url, '/') . "/members/my_savings.php"); // Member dashboard
+                        } else {
+                            // Member role without member_id: unusual, log and redirect to a safe page
+                            error_log("User ID: " . $_SESSION['user']['id'] . " has 'Member' role but no member_id.");
+                            $_SESSION['info_message'] = "Your account setup is incomplete. Please contact support.";
+                            header("Location: " . rtrim($base_url, '/') . "/landing.php");
+                        }
+                    } else {
+                        // Fallback for any other authenticated user without a specific dashboard defined yet,
+                        // or if roles are empty/unexpected.
+                        $user_roles_str = !empty($_SESSION['user']['roles']) ? implode(',', $_SESSION['user']['roles']) : 'No roles assigned';
+                        error_log("User ID: " . $_SESSION['user']['id'] . " logged in with unhandled roles: " . $user_roles_str);
+                        $_SESSION['info_message'] = "You have successfully logged in."; // Generic message
+                        header("Location: " . rtrim($base_url, '/') . "/landing.php"); // Default redirect
+                    }
                     exit;
                 }
             } else {

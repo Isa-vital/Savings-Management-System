@@ -1,13 +1,25 @@
 <?php
 session_start(); 
 
-if (!isset($_SESSION['admin']['id'])) {
-    $_SESSION['error'] = "Unauthorized access";
-    header('Location: ../auth/login.php');
+require_once __DIR__ . '/../config.php';      // For $pdo, BASE_URL, APP_NAME, sanitize()
+require_once __DIR__ . '/../helpers/auth.php'; // For require_login(), has_role()
+
+require_login(); // Redirects to login if not authenticated
+
+if (!has_role(['Core Admin', 'Administrator'])) {
+    $_SESSION['error_message'] = "You do not have permission to access this page.";
+    // Redirect to a safe page, like user's dashboard or landing page
+    if (has_role('Member') && isset($_SESSION['user']['member_id'])) {
+        header("Location: " . BASE_URL . "members/my_savings.php");
+    } else {
+        header("Location: " . BASE_URL . "landing.php"); // Or index.php if landing is not for logged-in users
+    }
     exit;
 }
 
-require_once __DIR__ . '/../config.php';
+// $pdo is available from config.php
+// sanitize() is assumed to be available from config.php or helpers/auth.php (config.php is more likely)
+
 // Check if member ID is provided
 if (!isset($_GET['member_no'])) {
     $_SESSION['error'] = "Member ID not specified";
