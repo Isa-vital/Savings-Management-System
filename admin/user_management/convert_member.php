@@ -85,7 +85,7 @@ try {
     $token_expires_at = date('Y-m-d H:i:s', time() + (24 * 60 * 60)); // 24 hours
 
     // 3. Insert into users table
-    $sql_insert_user = "INSERT INTO users (member_id, username, password_hash, email, phone, is_active, activation_token, token_expires_at, created_at, updated_at) 
+    $sql_insert_user = "INSERT INTO users (member_id, username, password_hash, email, phone, is_active, activation_token, token_expires_at, created_at, updated_at)
                         VALUES (:member_id, :username, :password_hash, :email, :phone, 0, :activation_token, :token_expires_at, NOW(), NOW())"; // Changed NULL to :password_hash
     $stmt_insert_user = $pdo->prepare($sql_insert_user);
     $stmt_insert_user->execute([
