@@ -1,23 +1,10 @@
 <?php
-<?php
-// Attempt to include config.php for APP_NAME and BASE_URL.
-$app_name = 'Our SACCO Platform'; // Default
-$base_url = '../'; // Default base URL for relative links from auth/ back to root
+// config.php should be the first include to define BASE_URL, APP_NAME and start the session.
+require_once __DIR__ . '/../config.php';
+// helpers/auth.php might be included by config.php or later if needed for has_role()
+// For now, login.php's own logic for including helpers before has_role calls is fine.
 
-if (file_exists(__DIR__ . '/../config.php')) {
-    @include_once __DIR__ . '/../config.php'; // Suppress errors
-    if (defined('APP_NAME')) {
-        $app_name = APP_NAME;
-    }
-    if (defined('BASE_URL')) {
-        $base_url = BASE_URL; // Assuming BASE_URL ends with a slash
-    }
-}
-
-// Session management is now handled by config.php (included above)
-// if (session_status() === PHP_SESSION_NONE) {
-//     session_start();
-// }
+// Session management is now handled by config.php
 // The original script had a session_unset() if session was active.
 // This is unusual for a login page unless it's meant to force a new login, clearing old session.
 // For a typical login, you'd just ensure session is started.
@@ -53,33 +40,33 @@ if (isset($_SESSION['user']['id'])) {
             // This is a critical problem if helpers are missing here
             error_log("CRITICAL: helpers/auth.php not found from auth/login.php (initial redirect). Role-based redirect will fail.");
             // Fallback to a generic redirect to prevent broken page, but this indicates a setup issue.
-            header("Location: " . rtrim($base_url, '/') . "/landing.php");
+            header("Location: " . BASE_URL . "landing.php");
             exit;
         }
     }
 
     if (function_exists('has_role')) { // Double check has_role is now available
         if (has_role(['Core Admin', 'Administrator'])) {
-            header("Location: " . rtrim($base_url, '/') . "/index.php"); // Admin dashboard
+            header("Location: " . BASE_URL . "index.php"); // Admin dashboard
         } elseif (has_role('Member')) {
             if (isset($_SESSION['user']['member_id']) && !empty($_SESSION['user']['member_id'])) {
-                header("Location: " . rtrim($base_url, '/') . "/members/my_savings.php"); // Member dashboard
+                header("Location: " . BASE_URL . "members/my_savings.php"); // Member dashboard
             } else {
                 // Member role without member_id: unusual, log and redirect to a safe page
                 error_log("User ID: " . ($_SESSION['user']['id'] ?? 'Unknown') . " (in login.php initial redirect) has 'Member' role but no member_id.");
                 $_SESSION['info_message'] = "Your account setup appears incomplete. Please contact support.";
-                header("Location: " . rtrim($base_url, '/') . "/landing.php");
+                header("Location: " . BASE_URL . "landing.php");
             }
         } else {
             // Fallback for any other authenticated user with roles not explicitly handled
             $user_roles_str = !empty($_SESSION['user']['roles']) ? implode(',', $_SESSION['user']['roles']) : 'No roles assigned';
             error_log("User ID: " . ($_SESSION['user']['id'] ?? 'Unknown') . " (in login.php initial redirect) has unhandled roles: " . $user_roles_str);
             $_SESSION['info_message'] = "You are already logged in."; // Generic message
-            header("Location: " . rtrim($base_url, '/') . "/landing.php"); // Default redirect
+            header("Location: " . BASE_URL . "landing.php"); // Default redirect
         }
     } else {
         // Fallback if has_role somehow still not defined (should have been caught by error_log above)
-        header("Location: " . rtrim($base_url, '/') . "/landing.php");
+        header("Location: " . BASE_URL . "landing.php");
     }
     exit;
 }
@@ -132,6 +119,20 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         'last_activity' => time()
                     ];
 
+                    // --- BEGIN TEMPORARY DEBUG ---
+                    // Log to PHP error log
+                    error_log("DEBUG auth/login.php - Login Success - User Session: " . print_r($_SESSION['user'], true));
+
+                    // Optional: Uncomment to print to browser and stop execution for immediate viewing
+                    /*
+                    echo "<pre>DEBUG: User Session (Remove these lines from auth/login.php after testing):
+";
+                    print_r($_SESSION['user']);
+                    echo "</pre>";
+                    exit;
+                    */
+                    // --- END TEMPORARY DEBUG ---
+
                     // Include helpers if has_role() is not yet available
                     // Note: config.php (which might include helpers) is already included at the top.
                     // This explicit include ensures it if config.php doesn't or if called directly.
@@ -150,16 +151,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     session_regenerate_id(true);
 
                     if (has_role(['Core Admin', 'Administrator'])) {
-                        header("Location: " . rtrim($base_url, '/') . "/index.php"); // Admin dashboard
+                        header("Location: " . BASE_URL . "index.php"); // Admin dashboard
                     } elseif (has_role('Member')) {
                         // Ensure member_id is set if they have Member role and are expected to see member pages
                         if (isset($_SESSION['user']['member_id']) && !empty($_SESSION['user']['member_id'])) {
-                            header("Location: " . rtrim($base_url, '/') . "/members/my_savings.php"); // Member dashboard
+                            header("Location: " . BASE_URL . "members/my_savings.php"); // Member dashboard
                         } else {
                             // Member role without member_id: unusual, log and redirect to a safe page
                             error_log("User ID: " . $_SESSION['user']['id'] . " has 'Member' role but no member_id.");
                             $_SESSION['info_message'] = "Your account setup is incomplete. Please contact support.";
-                            header("Location: " . rtrim($base_url, '/') . "/landing.php");
+                            header("Location: " . BASE_URL . "landing.php");
                         }
                     } else {
                         // Fallback for any other authenticated user without a specific dashboard defined yet,
@@ -167,7 +168,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         $user_roles_str = !empty($_SESSION['user']['roles']) ? implode(',', $_SESSION['user']['roles']) : 'No roles assigned';
                         error_log("User ID: " . $_SESSION['user']['id'] . " logged in with unhandled roles: " . $user_roles_str);
                         $_SESSION['info_message'] = "You have successfully logged in."; // Generic message
-                        header("Location: " . rtrim($base_url, '/') . "/landing.php"); // Default redirect
+                        header("Location: " . BASE_URL . "landing.php"); // Default redirect
                     }
                     exit;
                 }
@@ -186,7 +187,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - <?php echo htmlspecialchars($app_name); ?></title>
+    <title>Login - <?php echo htmlspecialchars(defined('APP_NAME') ? APP_NAME : 'Savings App'); ?></title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -261,9 +262,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 <body>
     <div class="login-container">
         <div class="login-header">
-            <a href="<?php echo rtrim($base_url, '/'); ?>/landing.php" title="Back to Homepage">
+            <a href="<?php echo htmlspecialchars(BASE_URL . 'landing.php'); ?>" title="Back to Homepage">
                 <i class="fas fa-home me-1"></i> <!-- Optional: Home icon -->
-                <h2><?php echo htmlspecialchars($app_name); ?></h2>
+                <h2><?php echo htmlspecialchars(defined('APP_NAME') ? APP_NAME : 'Savings App'); ?></h2>
             </a>
         </div>
 
@@ -288,15 +289,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         <input type="password" id="password" name="password" class="form-control" required>
                     </div>
                     <div class="mb-3 text-end">
-                        <a href="<?php echo rtrim($base_url, '/') . '/auth/forgot_password.php'; ?>" class="text-muted small">Forgot Password?</a>
+                        <a href="<?php echo htmlspecialchars(BASE_URL . 'auth/forgot_password.php'); ?>" class="text-muted small">Forgot Password?</a>
                     </div>
                     <button type="submit" class="btn btn-primary w-100">Login</button>
                 </form>
             </div>
         </div>
         <div class="login-footer">
-            <p>Don't have an account? <a href="<?php echo rtrim($base_url, '/'); ?>/auth/register.php">Sign Up</a></p>
-            <p class="text-muted">&copy; <?php echo date("Y"); ?> <?php echo htmlspecialchars($app_name); ?></p>
+            <p>Don't have an account? <a href="<?php echo htmlspecialchars(BASE_URL . 'auth/register.php'); ?>">Sign Up</a></p>
+            <p class="text-muted">&copy; <?php echo date("Y"); ?> <?php echo htmlspecialchars(defined('APP_NAME') ? APP_NAME : 'Savings App'); ?></p>
         </div>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>

@@ -10,22 +10,9 @@ ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 date_default_timezone_set('Africa/Nairobi');
 
-// ==================== SECURE SESSION ====================
+// ==================== SESSION HANDLING ==================== // Renamed section for clarity
 if (session_status() === PHP_SESSION_NONE) {
-    // Basic session start
     session_start();
-
-    // Or, for more secure options (ensure these are appropriate for your server setup):
-    /*
-    session_start([
-        'name' => 'SaccoSecureSession', // Custom session name
-        'cookie_lifetime' => 86400,    // Session cookie lifetime in seconds (1 day)
-        'cookie_secure' => isset($_SERVER['HTTPS']), // Send cookie only over HTTPS
-        'cookie_httponly' => true,     // Prevent JavaScript access to session cookie
-        'use_strict_mode' => true,     // Helps prevent session fixation
-        // 'save_path' => '/path/to/your/custom/session/save_path', // Optional: custom save path
-    ]);
-    */
 }
 
 // ==================== DATABASE (PDO POWER) ====================
@@ -82,7 +69,10 @@ function sanitize($data) {
 }
 
 // ==================== AUTH HELPERS ====================
+// It's better if these are primarily in helpers/auth.php and that file includes config.php or is included after it.
+// For now, keeping isLoggedIn here as it's simple and used by config itself for other commented out helpers.
 function isLoggedIn() {
+    // Session is assumed to be started by the block at the top of config.php
     return isset($_SESSION['user']);
 }
 
@@ -109,6 +99,7 @@ function requireAdmin() {
 
 // ==================== CSRF PROTECTION ====================
 function generateToken() {
+    // Session is assumed to be started by the block at the top of config.php
     if (empty($_SESSION['csrf_token'])) {
         $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
     }
@@ -116,6 +107,7 @@ function generateToken() {
 }
 
 function validateToken($token) {
+    // Session is assumed to be started by the block at the top of config.php
     return hash_equals($_SESSION['csrf_token'] ?? '', $token);
 }
 
@@ -129,8 +121,19 @@ function formatPhoneUG($phone) {
 }
 
 // ==================== APP CONSTANTS ====================
-define('APP_NAME', 'Rukindo Kweyamba Savings Group');
-define('BASE_URL', 'https://' . $_SERVER['HTTP_HOST'] . '/'); // Ensure this correctly reflects your base URL, including subdirectories if any.
+if (!defined('APP_NAME')) { // Define if not already defined (e.g. by the top diagnostic block)
+    define('APP_NAME', 'Rukindo Kweyamba Savings Group');
+}
+if (!defined('BASE_URL')) { // Define if not already defined
+     // Basic fallback, ensure it ends with a slash.
+    $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' || $_SERVER['SERVER_PORT'] == 443) ? "https://" : "http://";
+    $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+    $base_path_segment = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
+    if (basename($base_path_segment) === 'config') { // If config.php is in a 'config' subdir
+        $base_path_segment = dirname($base_path_segment);
+    }
+    define('BASE_URL', $protocol . $host . rtrim($base_path_segment, '/\\') . '/');
+}
 define('MAX_LOGIN_ATTEMPTS', 5);
 define('LOCKOUT_TIME', 15 * 60); // 15 minutes
 
@@ -165,5 +168,7 @@ define('MAIL_FROM_NAME', (defined('APP_NAME') ? APP_NAME : 'Savings App') . ' Su
 // ==================== AUTO-CLOSE CONNECTION ====================
 register_shutdown_function(function() {
     global $pdo;
-    $pdo = null; // Proper PDO connection closure
+    if ($pdo) { // Check if $pdo was successfully initialized
+        $pdo = null; // Proper PDO connection closure
+    }
 });

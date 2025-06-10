@@ -14,27 +14,32 @@ if (!file_exists(session_save_path()) || !is_writable(session_save_path())) {
 
 // Standardize session check
 // config.php should be included first to make BASE_URL available.
-    die('Session directory not writable: ' . session_save_path());
-}
-
-// Standardize session check
-// config.php should be included first to make BASE_URL available.
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/helpers/auth.php'; // Include the new auth helpers
 
-// Ensure BASE_URL is defined, with a fallback if necessary (though config.php should handle this)
-if (!defined('BASE_URL')) {
-    // Basic auto-detection for BASE_URL if running in a subdirectory
-    $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' || $_SERVER['SERVER_PORT'] == 443) ? "https://" : "http://";
-    $host = $_SERVER['HTTP_HOST'];
-    $script_name = $_SERVER['SCRIPT_NAME']; // e.g., /savingsapp/index.php
-    $base_path = rtrim(dirname($script_name), '/\\');
-    if ($base_path === '' || $base_path === $script_name) {
-        $base_path = '';
-    }
-    define('BASE_URL', $protocol . $host . $base_path . '/');
+// --- BEGIN SESSION PATH DEBUGGING for index.php ---
+$effective_save_path = ini_get('session.save_path');
+$session_status_value = session_status();
+$is_path_writable = false;
+if (!empty($effective_save_path) && is_dir($effective_save_path)) {
+    $is_path_writable = is_writable($effective_save_path);
+} elseif (!empty($effective_save_path) && !is_dir($effective_save_path)) {
+    // Path is set but not a directory
+     error_log("DEBUG index.php - session.save_path ('" . $effective_save_path . "') IS NOT A DIRECTORY.");
 }
 
+
+error_log("DEBUG index.php - Effective session.save_path: " . $effective_save_path);
+error_log("DEBUG index.php - Session status: " . $session_status_value . " (2 is active)");
+
+if ($is_path_writable) {
+    error_log("DEBUG index.php - Effective session.save_path IS WRITABLE.");
+} else {
+    error_log("DEBUG index.php - Effective session.save_path IS NOT WRITABLE or NOT A DIRECTORY. Path: '" . $effective_save_path . "'");
+}
+// --- END SESSION PATH DEBUGGING for index.php ---
+
+// BASE_URL is now expected to be reliably defined in config.php, so local fallback is removed.
 
 if (!isset($_SESSION['user']['id'])) { // Check the new session structure
     // Redirect to landing page if not logged in, as login page is for explicit login action.
