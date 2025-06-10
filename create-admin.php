@@ -11,7 +11,7 @@ $fullName = "System Admin";
 $email = "isaacmukonyezi2.0@gmail.com";
 $phone = "0754902000"; // Store as string
 $username = "CoreAdmin";
-$plainPassword = "Today123"; // Ensure this is a strong password in a real scenario
+$plainPassword = "Today123"; 
 
 echo "Attempting to create Core Admin user...\n";
 

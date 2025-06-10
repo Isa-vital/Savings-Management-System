@@ -8,14 +8,12 @@
 // For now, commenting out as config.php handles session start, and this check might be too strict/problematic.
 /*
 if (!file_exists(session_save_path()) || !is_writable(session_save_path())) {
-    die('Session directory not writable: ' . session_save_path());
-}
+die('Session directory not writable: ' . session_save_path());
 */
 
 // Standardize session check
 // config.php should be included first to make BASE_URL available.
-    die('Session directory not writable: ' . session_save_path());
-}
+die('Session directory not writable: ' . session_save_path());
 
 // Standardize session check
 // config.php should be included first to make BASE_URL available.

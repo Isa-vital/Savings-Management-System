@@ -1,8 +1,5 @@
 <?php
-/**
- * Rukindo Kweyamba Savings System - Supercharged Config
- * Now with PDO Security & Better Performance
- */
+
 
 // ==================== CORE SETTINGS ====================
 ini_set('display_errors', 1);
@@ -10,9 +7,21 @@ ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 date_default_timezone_set('Africa/Nairobi');
 
-// ==================== SESSION HANDLING ==================== // Renamed section for clarity
+// ==================== SECURE SESSION ====================
 if (session_status() === PHP_SESSION_NONE) {
-    session_start(); 
+    // Basic session start
+    session_start();
+
+    // Or, for more secure options (ensure these are appropriate for your server setup):
+
+    session_start([
+        'name' => 'SaccoSecureSession', // Custom session name
+        'cookie_lifetime' => 86400,    // Session cookie lifetime in seconds (1 day)
+        'cookie_secure' => isset($_SERVER['HTTPS']), // Send cookie only over HTTPS
+        'cookie_httponly' => true,     // Prevent JavaScript access to session cookie
+        'use_strict_mode' => true,     // Helps prevent session fixation
+        // 'save_path' => '/path/to/your/custom/session/save_path', // Optional: custom save path
+    ]);
 }
 
 // ==================== DATABASE (PDO POWER) ====================
@@ -22,6 +31,8 @@ define('DB_USER', 'root');
 define('DB_PASS', '');
 define('DB_PORT', '3306');
 define('DB_CHARSET', 'utf8mb4');         // Database charset
+define('BASE_URL', 'http://localhost/savingssystem/');   ///uncomment this in dev environment
+
 
 
 try {
@@ -37,7 +48,7 @@ try {
     );
 } catch (PDOException $e) {
     error_log("DB Connection Failed: " . $e->getMessage());
-    die("System temporarily unavailable. Staff notified.");
+die("Oops! \n. Database not well connected!");
 }
 
 // ==================== ESSENTIAL FUNCTIONS ====================
@@ -69,10 +80,7 @@ function sanitize($data) {
 }
 
 // ==================== AUTH HELPERS ====================
-// It's better if these are primarily in helpers/auth.php and that file includes config.php or is included after it.
-// For now, keeping isLoggedIn here as it's simple and used by config itself for other commented out helpers.
 function isLoggedIn() {
-    // Session is assumed to be started by the block at the top of config.php
     return isset($_SESSION['user']);
 }
 
@@ -99,7 +107,6 @@ function requireAdmin() {
 
 // ==================== CSRF PROTECTION ====================
 function generateToken() {
-    // Session is assumed to be started by the block at the top of config.php
     if (empty($_SESSION['csrf_token'])) {
         $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
     }
@@ -107,7 +114,6 @@ function generateToken() {
 }
 
 function validateToken($token) {
-    // Session is assumed to be started by the block at the top of config.php
     return hash_equals($_SESSION['csrf_token'] ?? '', $token);
 }
 
@@ -121,28 +127,17 @@ function formatPhoneUG($phone) {
 }
 
 // ==================== APP CONSTANTS ====================
-if (!defined('APP_NAME')) { // Define if not already defined (e.g. by the top diagnostic block)
-    define('APP_NAME', 'Rukindo Kweyamba Savings Group');
-}
-if (!defined('BASE_URL')) { // Define if not already defined
-     // Basic fallback, ensure it ends with a slash.
-    $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' || $_SERVER['SERVER_PORT'] == 443) ? "https://" : "http://";
-    $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-    $base_path_segment = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
-    if (basename($base_path_segment) === 'config') { // If config.php is in a 'config' subdir
-        $base_path_segment = dirname($base_path_segment);
-    }
-    define('BASE_URL', $protocol . $host . rtrim($base_path_segment, '/\\') . '/');
-}
+define('APP_NAME', 'Rukindo Kweyamba Savings Group');
+//define('BASE_URL', 'https://' . $_SERVER['HTTP_HOST'] . '/'); // Ensure this correctly reflects your base URL, including subdirectories if any.
 define('MAX_LOGIN_ATTEMPTS', 5);
 define('LOCKOUT_TIME', 15 * 60); // 15 minutes
 
 
 // ==================== EMAIL (PHPMailer SMTP) SETTINGS ====================
 // --- IMPORTANT: Fill these placeholders with your actual SMTP credentials ---
-define('SMTP_HOST', 'your_smtp_server.example.com'); // e.g., 'smtp.gmail.com' or your hosting provider's SMTP server
-define('SMTP_USERNAME', 'your_smtp_username@example.com');    // Your SMTP username (often your email address)
-define('SMTP_PASSWORD', 'your_smtp_password');                // Your SMTP password (or app-specific password)
+define('SMTP_HOST', 'smtp.gmail.com'); // e.g., 'smtp.gmail.com' or your hosting provider's SMTP server
+define('SMTP_USERNAME', 'isaacvital44@gmail.com');    // Your SMTP username (often your email address)
+define('SMTP_PASSWORD', 'kpgt iiqs xhhh dsie');                // Your SMTP password (or app-specific password)
 define('SMTP_PORT', 587);                                 // SMTP port (e.g., 587 for TLS, 465 for SSL, 25 for unencrypted)
 define('SMTP_ENCRYPTION', 'tls');                         // SMTP encryption: 'tls' (recommended), 'ssl', or false for none
                                                           // For PHPMailer, this translates to:
@@ -150,7 +145,7 @@ define('SMTP_ENCRYPTION', 'tls');                         // SMTP encryption: 't
                                                           // 'ssl' -> PHPMailer::ENCRYPTION_SMTPS
                                                           // false -> $mail->SMTPSecure = false; (though might still use opportunistic TLS)
 
-define('MAIL_FROM_EMAIL', 'no-reply@yourdomain.com');      // The email address system emails will be sent from
+define('MAIL_FROM_EMAIL', 'isaacvital44@gmail.com');      // The email address system emails will be sent from
 define('MAIL_FROM_NAME', (defined('APP_NAME') ? APP_NAME : 'Savings App') . ' Support'); // Uses APP_NAME if defined
 
 // --- PHPMailer Path ---
@@ -168,7 +163,5 @@ define('MAIL_FROM_NAME', (defined('APP_NAME') ? APP_NAME : 'Savings App') . ' Su
 // ==================== AUTO-CLOSE CONNECTION ====================
 register_shutdown_function(function() {
     global $pdo;
-    if ($pdo) { // Check if $pdo was successfully initialized
-        $pdo = null; // Proper PDO connection closure
-    }
+    $pdo = null; // Proper PDO connection closure
 });

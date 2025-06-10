@@ -1,0 +1,1 @@
+csrf_token|s:64:"ff878fbbb1f0165a45baca8452be23ee3d7b5a49598811710246ff329e6e4d44";user|a:7:{s:2:"id";i:3;s:8:"username";s:9:"CoreAdmin";s:5:"email";s:27:"isaacmukonyezi2.0@gmail.com";s:9:"member_id";i:27;s:5:"roles";a:1:{i:0;s:10:"Core Admin";}s:6:"groups";a:1:{i:0;s:11:"Core Admins";}s:13:"last_activity";i:1749566670;}
