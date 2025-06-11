@@ -104,6 +104,32 @@ try {
     $stmt_update_member = $pdo->prepare($sql_update_member);
     $stmt_update_member->execute(['user_id' => $new_user_id, 'member_id' => $member['id']]);
 
+    // ---- Assign Default Role and Group ----
+    $default_member_role_id = 3; // Assuming 'Member' role is ID 3
+    $default_members_group_id = 2; // Assuming 'Default Members' group is ID 2
+
+    // Ensure the default group exists (optional, but good for robustness if groups can be deleted)
+    // For this subtask, we assume group ID 2 exists or will be manually created.
+    // A more robust script might do:
+    // $stmt_ensure_group = $pdo->prepare("INSERT IGNORE INTO groups (id, group_name, description) VALUES (:id, :name, :desc)");
+    // $stmt_ensure_group->execute(['id' => $default_members_group_id, 'name' => 'Default Members', 'desc' => 'Default group for new members']);
+
+    $stmt_assign_role = $pdo->prepare(
+        "INSERT INTO user_group_roles (user_id, group_id, role_id)
+         VALUES (:user_id, :group_id, :role_id)"
+    );
+    $stmt_assign_role->execute([
+        ':user_id' => $new_user_id,
+        ':group_id' => $default_members_group_id,
+        ':role_id' => $default_member_role_id
+    ]);
+
+    if ($stmt_assign_role->rowCount() == 0) {
+        // This should ideally not happen if user_id is valid and group/role IDs exist and are valid FKs
+        throw new Exception("Critical: Failed to assign default role to the user during member conversion.");
+    }
+    // ---- END Assign Default Role and Group ----
+
     $pdo->commit();
 
     // 5. Notifications (Actual Email Sending)

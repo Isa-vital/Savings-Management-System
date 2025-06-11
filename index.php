@@ -16,27 +16,7 @@ die('Session directory not writable: ' . session_save_path());
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/helpers/auth.php'; // Include the new auth helpers
 
-// --- BEGIN SESSION PATH DEBUGGING for index.php ---
-$effective_save_path = ini_get('session.save_path');
-$session_status_value = session_status();
-$is_path_writable = false;
-if (!empty($effective_save_path) && is_dir($effective_save_path)) {
-    $is_path_writable = is_writable($effective_save_path);
-} elseif (!empty($effective_save_path) && !is_dir($effective_save_path)) {
-    // Path is set but not a directory
-     error_log("DEBUG index.php - session.save_path ('" . $effective_save_path . "') IS NOT A DIRECTORY.");
-}
-
-
-error_log("DEBUG index.php - Effective session.save_path: " . $effective_save_path);
-error_log("DEBUG index.php - Session status: " . $session_status_value . " (2 is active)");
-
-if ($is_path_writable) {
-    error_log("DEBUG index.php - Effective session.save_path IS WRITABLE.");
-} else {
-    error_log("DEBUG index.php - Effective session.save_path IS NOT WRITABLE or NOT A DIRECTORY. Path: '" . $effective_save_path . "'");
-}
-// --- END SESSION PATH DEBUGGING for index.php ---
+// Session path debugging block removed.
 
 // BASE_URL is now expected to be reliably defined in config.php, so local fallback is removed.
 

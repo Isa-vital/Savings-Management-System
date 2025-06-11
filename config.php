@@ -124,9 +124,9 @@ function formatPhoneUG($phone) {
 if (!defined('APP_NAME')) { // Define if not already defined
     define('APP_NAME', 'Rukindo Kweyamba Savings Group');
 }
+define('APP_VERSION', '1.0.0'); // Application version
 // Ensure this line is active (uncommented) and replaces any dynamic BASE_URL definition for this test.
 define('BASE_URL', 'http://localhost/savingssystem/');   ///uncomment this in dev environment
-error_log("DEBUG config.php: BASE_URL successfully defined as: " . BASE_URL); // <-- ADDED LINE
 
 define('MAX_LOGIN_ATTEMPTS', 5);
 define('LOCKOUT_TIME', 15 * 60); // 15 minutes

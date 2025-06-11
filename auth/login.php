@@ -1,6 +1,5 @@
 <?php
 require_once __DIR__ . '/../config.php'; // Defines BASE_URL, APP_NAME, starts session.
-error_log("DEBUG login.php after config include: BASE_URL value is: " . (defined('BASE_URL') ? BASE_URL : 'BASE_URL_IS_NOT_DEFINED_HERE')); // <-- ADDED LINE
 // NO other definitions of BASE_URL or $base_url in this script.
 // helpers/auth.php might be included by config.php or later if needed for has_role()
 // For now, login.php's own logic for including helpers before has_role calls is fine.
@@ -152,10 +151,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     session_regenerate_id(true);
 
                     if (has_role(['Core Admin', 'Administrator'])) {
-                        // Existing error_log lines can remain if desired, or be removed.
-                        // error_log("DEBUG login.php: Admin redirect base_url_value: '" . (defined('BASE_URL') ? BASE_URL : 'BASE_URL_NOT_DEFINED') . "'");
-                        // error_log("DEBUG login.php: Admin redirect path computed: '" . (defined('BASE_URL') ? BASE_URL . "index.php" : 'BASE_URL_NOT_DEFINED/index.php') . "'");
-                        
+                        // error_log lines for BASE_URL for admin redirect removed as per instruction.
+
                         /* --- BEGIN LOUD DEBUG FOR ADMIN REDIRECT ---
                         echo "DEBUG FROM auth/login.php:<br>";
                         echo "---------------------------------<br>";
@@ -171,7 +168,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         echo "</pre>";
                         echo "---------------------------------<br>";
                         echo "Script execution stopped here for debugging BEFORE redirect.";
-                        exit; 
+                        exit;
                         --- END LOUD DEBUG FOR ADMIN REDIRECT --- */
 
                         // This line will NOW be reached:
