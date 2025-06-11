@@ -133,30 +133,15 @@ define('LOCKOUT_TIME', 15 * 60); // 15 minutes
 
 
 // ==================== EMAIL (PHPMailer SMTP) SETTINGS ====================
-// --- IMPORTANT: Fill these placeholders with your actual SMTP credentials ---
-define('SMTP_HOST', 'your_smtp_server.example.com'); // e.g., 'smtp.gmail.com' or your hosting provider's SMTP server
-define('SMTP_USERNAME', 'your_smtp_username@example.com');    // Your SMTP username (often your email address)
-define('SMTP_PASSWORD', 'your_smtp_password');                // Your SMTP password (or app-specific password)
+
+define('SMTP_HOST', 'smtp.gmail.com'); // e.g., 'smtp.gmail.com' or our hosting provider's SMTP server
+define('SMTP_USERNAME', 'info.rksavingssystem@gmail.com');    // our SMTP username (often your email address)
+define('SMTP_PASSWORD', 'xsrc mqgl fsum lizm');                // our SMTP password (or app-specific password)
 define('SMTP_PORT', 587);                                 // SMTP port (e.g., 587 for TLS, 465 for SSL, 25 for unencrypted)
 define('SMTP_ENCRYPTION', 'tls');                         // SMTP encryption: 'tls' (recommended), 'ssl', or false for none
-                                                          // For PHPMailer, this translates to:
-                                                          // 'tls' -> PHPMailer::ENCRYPTION_STARTTLS
-                                                          // 'ssl' -> PHPMailer::ENCRYPTION_SMTPS
-                                                          // false -> $mail->SMTPSecure = false; (though might still use opportunistic TLS)
-
-define('MAIL_FROM_EMAIL', 'no-reply@yourdomain.com');      // The email address system emails will be sent from
+                                                         
+define('MAIL_FROM_EMAIL', 'info.rksavingssystem@gmail.com');      // The email address system emails will be sent from
 define('MAIL_FROM_NAME', (defined('APP_NAME') ? APP_NAME : 'Savings App') . ' Support'); // Uses APP_NAME if defined
-
-// --- PHPMailer Path ---
-// If you installed PHPMailer via Composer, this should be all you need in scripts that send email:
-// require_once __DIR__ . '/vendor/autoload.php';
-//
-// If you've manually downloaded PHPMailer, you might need to define paths to its classes,
-// or include them directly in the scripts. For now, we'll assume Composer / autoloading.
-// Example for manual include (less common now):
-// define('PHPMAILER_PATH_PHPMAILER', __DIR__ . '/path/to/phpmailer/src/PHPMailer.php');
-// define('PHPMAILER_PATH_SMTP', __DIR__ . '/path/to/phpmailer/src/SMTP.php');
-// define('PHPMAILER_PATH_EXCEPTION', __DIR__ . '/path/to/phpmailer/src/Exception.php');
 
 
 // ==================== AUTO-CLOSE CONNECTION ====================
