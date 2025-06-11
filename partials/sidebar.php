@@ -105,8 +105,9 @@ $is_logged_in_user = function_exists('is_logged_in') ? is_logged_in() : (functio
                 $can_see_system_settings = has_role('Core Admin');
                 $can_see_user_management = has_role(['Core Admin', 'Administrator']);
                 $can_see_group_management = has_role('Core Admin');
+                $can_see_loan_management = has_role(['Core Admin', 'Administrator']); // Added this
 
-                if ($can_see_system_settings || $can_see_user_management || $can_see_group_management) :
+                if ($can_see_system_settings || $can_see_user_management || $can_see_group_management || $can_see_loan_management) : // Added $can_see_loan_management
                 ?>
                     <li class="nav-item">
                         <a class="nav-link fw-bold d-flex justify-content-between align-items-center" href="#adminSubmenu" data-bs-toggle="collapse" role="button" aria-expanded="false" aria-controls="adminSubmenu">
@@ -119,6 +120,14 @@ $is_logged_in_user = function_exists('is_logged_in') ? is_logged_in() : (functio
                                 <li class="nav-item">
                                     <a class="nav-link" href="<?= htmlspecialchars(BASE_URL . 'admin/system_settings/index.php') ?>">
                                         <i class="fas fa-cogs me-2 text-secondary"></i> System Settings
+                                    </a>
+                                </li>
+                                <?php endif; ?>
+
+                                <?php if ($can_see_loan_management) : ?>
+                                <li class="nav-item">
+                                    <a class="nav-link" href="<?= htmlspecialchars(BASE_URL . 'admin/loans/loan_applications_list.php') ?>">
+                                        <i class="fas fa-file-invoice-dollar me-2 text-secondary"></i> Loan Applications
                                     </a>
                                 </li>
                                 <?php endif; ?>
@@ -162,6 +171,11 @@ $is_logged_in_user = function_exists('is_logged_in') ? is_logged_in() : (functio
                     <li class="nav-item">
                         <a class="nav-link" href="<?php echo htmlspecialchars(BASE_URL . 'members/savings_performance.php'); ?>">
                             <i class="fas fa-chart-line me-2"></i> Savings Performance
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="<?php echo htmlspecialchars(BASE_URL . 'loans/apply_loan.php'); ?>">
+                            <i class="fas fa-hand-holding-usd me-2"></i> Apply for Loan
                         </a>
                     </li>
                     <li class="nav-item">

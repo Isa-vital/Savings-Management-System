@@ -127,6 +127,7 @@ if (!defined('APP_NAME')) { // Define if not already defined
 define('APP_VERSION', '1.0.0'); // Application version
 // Ensure this line is active (uncommented) and replaces any dynamic BASE_URL definition for this test.
 define('BASE_URL', 'http://localhost/savingssystem/');   ///uncomment this in dev environment
+define('APP_CURRENCY_SYMBOL', 'UGX'); // Default currency symbol
 
 define('MAX_LOGIN_ATTEMPTS', 5);
 define('LOCKOUT_TIME', 15 * 60); // 15 minutes
