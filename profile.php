@@ -8,8 +8,25 @@ require_login(); // Ensures any logged-in user can access their profile.
 
 $user_id = $_SESSION['user']['id'];
 $current_user_data = null;
+
+// Variables for SweetAlert
+$sa_profile_error = '';
+$sa_profile_success = '';
+
+// Capture session messages for SweetAlert and then unset them
+if (isset($_SESSION['error_message'])) {
+    $sa_profile_error = $_SESSION['error_message'];
+    unset($_SESSION['error_message']);
+}
+if (isset($_SESSION['success_message'])) {
+    $sa_profile_success = $_SESSION['success_message'];
+    unset($_SESSION['success_message']);
+}
+
+// $error_message is for inline display of POST validation errors from the current request
 $error_message = '';
-$success_message = '';
+// $success_message is for inline display (though SweetAlert is primary now for success from session/redirect)
+$success_message = $sa_profile_success; // Initialize with session success for potential inline display
 
 
 // Fetch user profile
@@ -171,10 +188,10 @@ if(isset($_SESSION['error_message']) && empty($error_message)){ // From redirect
         <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
             <h2 class="mb-4"><i class="fas fa-user-circle me-2"></i>My Profile</h2>
 
-            <?php if ($success_message): ?>
-                <div class="alert alert-success"><?php echo htmlspecialchars($success_message); ?></div>
-            <?php endif; ?>
-            <?php if ($error_message): ?>
+            <?php /* Inline success message for $_SESSION['success_message'] (now $success_message var)
+                     and $_GET['updated'] will be handled by SweetAlert.
+                     Only keeping inline $error_message for immediate POST validation feedback. */ ?>
+            <?php if (!empty($error_message) && empty($sa_profile_error) ): // Only show if it's a POST error not yet set for SA ?>
                 <div class="alert alert-danger"><?php echo htmlspecialchars($error_message); ?></div>
             <?php endif; ?>
 
@@ -237,5 +254,42 @@ if(isset($_SESSION['error_message']) && empty($error_message)){ // From redirect
     </div>
     <?php require_once 'partials/footer.php'; ?>
 </div>
+<<<<<<< HEAD
 
    
+=======
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        <?php
+        // Consolidate GET 'updated' flag into $sa_profile_success if no other session success message exists
+        if (isset($_GET['updated']) && $_GET['updated'] == '1' && empty($sa_profile_success)) {
+             $sa_profile_success = 'Profile updated successfully.';
+        }
+        // If $error_message was set from POST validation (and not from session), ensure it's set for SweetAlert
+        if (!empty($error_message) && empty($sa_profile_error)) {
+            $sa_profile_error = $error_message;
+        }
+        ?>
+        <?php if (!empty($sa_profile_error)): ?>
+            Swal.fire({
+                icon: 'error',
+                title: 'Update Error',
+                html: '<?php echo addslashes(htmlspecialchars($sa_profile_error)); ?>', // Use html to render <br> if present
+            });
+        <?php endif; ?>
+        <?php if (!empty($sa_profile_success)): ?>
+            Swal.fire({
+                icon: 'success',
+                title: 'Success!',
+                text: '<?php echo addslashes(htmlspecialchars($sa_profile_success)); ?>',
+            });
+            // Clean the URL if updated=1 was present
+            if (window.location.search.includes('updated=1')) {
+                history.replaceState(null, '', window.location.pathname);
+            }
+        <?php endif; ?>
+    });
+</script>
+>>>>>>> fae297eec5a53500d5bda68acce40832ef0b4522

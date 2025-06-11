@@ -15,11 +15,19 @@ require_once __DIR__ . '/../config.php'; // Defines BASE_URL, APP_NAME, starts s
 // $pdo is available from config.php
 
 // Initialize variables at the start
-$error = $_SESSION['error_message'] ?? ''; // Use session error message if available
+// Keep $error for inline display if needed, but also prepare for SweetAlert
+$sa_error = $_SESSION['error_message'] ?? '';
 if(isset($_SESSION['error_message'])) unset($_SESSION['error_message']);
+// If $error was specifically set by POST logic, it takes precedence for inline display
+$error = $sa_error; // Populate $error for existing inline display
 
-$success_message = $_SESSION['success_message'] ?? '';
+$sa_success = $_SESSION['success_message'] ?? '';
 if(isset($_SESSION['success_message'])) unset($_SESSION['success_message']);
+$success_message = $sa_success; // Populate $success_message for existing inline display
+
+$sa_info = $_SESSION['info_message'] ?? '';
+if(isset($_SESSION['info_message'])) unset($_SESSION['info_message']);
+// $info_message is not typically displayed inline on login form, only via SweetAlert
 
 $username = '';
 
@@ -322,5 +330,31 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         </div>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            <?php if (!empty($sa_error)): ?>
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Login Failed', // Or a more generic 'Oops...'
+                    text: '<?php echo addslashes(htmlspecialchars($sa_error)); ?>',
+                });
+            <?php endif; ?>
+            <?php if (!empty($sa_success)): ?>
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Success!',
+                    text: '<?php echo addslashes(htmlspecialchars($sa_success)); ?>',
+                });
+            <?php endif; ?>
+            <?php if (!empty($sa_info)): ?>
+                Swal.fire({
+                    icon: 'info',
+                    title: 'Information',
+                    text: '<?php echo addslashes(htmlspecialchars($sa_info)); ?>',
+                });
+            <?php endif; ?>
+        });
+    </script>
 </body>
 </html>

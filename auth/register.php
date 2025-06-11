@@ -11,8 +11,12 @@ require_once __DIR__ . '/../config.php'; // For $pdo, BASE_URL, helper functions
 require_once __DIR__ . '/../vendor/autoload.php';
 
 $errors = [];
+// $success_message for potential inline display (though success usually redirects)
 $success_message = $_SESSION['success_message'] ?? null;
-if ($success_message) unset($_SESSION['success_message']);
+// $sa_reg_success for sweetalert, primarily if this page were to show its own success after an action not leading to redirect.
+$sa_reg_success = $_SESSION['success_message'] ?? '';
+if(isset($_SESSION['success_message'])) unset($_SESSION['success_message']);
+
 
 // Helper function to generate a unique member number
 function generateNewMemberNo(PDO $pdo): string {
@@ -229,6 +233,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 }
+
+// Prepare SweetAlert messages after POST handling and $errors array is populated
+$sa_reg_errors_html = '';
+// Check if it was a POST request and if there are any errors to display
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($errors)) {
+    // Prioritize CSRF or DB errors for a more prominent single message if they occurred
+    if (isset($errors['csrf'])) {
+        $sa_reg_errors_html = addslashes(htmlspecialchars($errors['csrf']));
+    } elseif (isset($errors['db'])) {
+        $sa_reg_errors_html = addslashes(htmlspecialchars($errors['db']));
+    } else {
+        // Collate other validation errors into a list
+        $error_list_html = '<ul style="text-align: left; padding-left: 20px;">';
+        foreach ($errors as $key => $err_msg) {
+            // We already handled csrf and db, so skip them if they were the only ones.
+            // This ensures other specific field errors get listed.
+            if ($key !== 'csrf' && $key !== 'db') {
+                 $error_list_html .= '<li>' . addslashes(htmlspecialchars($err_msg)) . '</li>';
+            }
+        }
+        $error_list_html .= '</ul>';
+        // If only csrf/db errors were present, $error_list_html might just be "<ul></ul>"
+        // Only use it if it actually contains list items.
+        if (strpos($error_list_html, '<li>') !== false) {
+            $sa_reg_errors_html = $error_list_html;
+        } elseif (empty($sa_reg_errors_html) && !empty($errors)) {
+            // Fallback if somehow errors exist but not csrf/db and list is empty (should not happen with current logic)
+            $sa_reg_errors_html = 'Please correct the highlighted errors.';
+        }
+    }
+}
+// $sa_reg_success is already captured from session at the top.
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -307,5 +343,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            <?php if (!empty($sa_reg_errors_html)): ?>
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Registration Failed',
+                    html: '<?php echo $sa_reg_errors_html; ?>', // Use html property for list
+                });
+            <?php endif; ?>
+            <?php
+            // This is less likely to be used here as success leads to redirect.
+            // Kept for completeness if a success message is ever set directly for register.php.
+            if (!empty($sa_reg_success)):
+            ?>
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Notice',
+                    text: '<?php echo addslashes(htmlspecialchars($sa_reg_success)); ?>',
+                });
+            <?php endif; ?>
+        });
+    </script>
 </body>
 </html>
