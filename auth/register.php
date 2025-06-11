@@ -126,6 +126,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt_update_member = $pdo->prepare("UPDATE memberz SET is_system_user = 1, user_id = :user_id WHERE id = :member_id");
                 $stmt_update_member->execute(['user_id' => $user_id_db, 'member_id' => $member_id_db]);
 
+                // ---- Assign Default Role and Group ----
+                $default_member_role_id = 3; // Assuming 'Member' role is ID 3
+                $default_members_group_id = 2; // Assuming 'Default Members' group is ID 2 (or a suitable default group)
+
+                // Ensure the default group exists (optional, but good for robustness if groups can be deleted)
+                // For this subtask, we assume group ID 2 exists or will be manually created.
+                // A more robust script might do:
+                // $stmt_ensure_group = $pdo->prepare("INSERT IGNORE INTO groups (id, group_name, description) VALUES (:id, :name, :desc)");
+                // $stmt_ensure_group->execute(['id' => $default_members_group_id, 'name' => 'Default Members', 'desc' => 'Default group for new registrations']);
+
+                $stmt_assign_role = $pdo->prepare(
+                    "INSERT INTO user_group_roles (user_id, group_id, role_id)
+                     VALUES (:user_id, :group_id, :role_id)"
+                );
+                $stmt_assign_role->execute([
+                    ':user_id' => $user_id_db,
+                    ':group_id' => $default_members_group_id,
+                    ':role_id' => $default_member_role_id
+                ]);
+
+                if ($stmt_assign_role->rowCount() == 0) {
+                    // This should ideally not happen if user_id is valid and group/role IDs exist and are valid FKs
+                    throw new Exception("Critical: Failed to assign default role to the new user during registration.");
+                }
+                // ---- END Assign Default Role and Group ----
+
                 $pdo->commit();
 
                 // Send activation email

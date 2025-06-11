@@ -1,6 +1,6 @@
 <?php
-// config.php should be the first include to define BASE_URL, APP_NAME and start the session.
-require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../config.php'; // Defines BASE_URL, APP_NAME, starts session.
+// NO other definitions of BASE_URL or $base_url in this script.
 // helpers/auth.php might be included by config.php or later if needed for has_role()
 // For now, login.php's own logic for including helpers before has_role calls is fine.
 
@@ -151,6 +151,27 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     session_regenerate_id(true);
 
                     if (has_role(['Core Admin', 'Administrator'])) {
+                        // error_log lines for BASE_URL for admin redirect removed as per instruction.
+
+                        /* --- BEGIN LOUD DEBUG FOR ADMIN REDIRECT ---
+                        echo "DEBUG FROM auth/login.php:<br>";
+                        echo "---------------------------------<br>";
+                        echo "Current BASE_URL is: '" . (defined('BASE_URL') ? htmlspecialchars(BASE_URL) : 'BASE_URL_NOT_DEFINED') . "'<br>";
+                        echo "Computed redirect for admin is: '" . (defined('BASE_URL') ? htmlspecialchars(BASE_URL . "index.php") : 'BASE_URL_NOT_DEFINED/index.php') . "'<br>";
+                        echo "<br>SESSION DATA just before admin redirect:<br>";
+                        echo "<pre>";
+                        if (isset($_SESSION['user'])) {
+                            print_r($_SESSION['user']);
+                        } else {
+                            echo "No \$_SESSION['user'] data found at this point.";
+                        }
+                        echo "</pre>";
+                        echo "---------------------------------<br>";
+                        echo "Script execution stopped here for debugging BEFORE redirect.";
+                        exit;
+                        --- END LOUD DEBUG FOR ADMIN REDIRECT --- */
+
+                        // This line will NOW be reached:
                         header("Location: " . BASE_URL . "index.php"); // Admin dashboard
                     } elseif (has_role('Member')) {
                         // Ensure member_id is set if they have Member role and are expected to see member pages
