@@ -1,6 +1,6 @@
 <?php
 // This should be the first file included if it handles session_start()
-require_once __DIR__ . '/config.php'; 
+require_once __DIR__ . '/config.php';
 
 echo "<h1>Session Test Page</h1>";
 
@@ -31,11 +31,11 @@ echo "<h2>Session Variable Test:</h2>";
 if (isset($_SESSION['minimal_test'])) {
     echo "<p style='color:green;'>Session variable 'minimal_test' IS SET.</p>";
     echo "<p>Current value: " . htmlspecialchars($_SESSION['minimal_test']) . "</p>";
-    
+
     // Increment a counter
     $_SESSION['minimal_test_count'] = isset($_SESSION['minimal_test_count']) ? $_SESSION['minimal_test_count'] + 1 : 1;
     echo "<p>Refresh count: " . $_SESSION['minimal_test_count'] . "</p>";
-    
+
     if ($_SESSION['minimal_test_count'] > 1) {
         echo "<p style='color:green; font-weight:bold;'>Session appears to be persisting across page loads!</p>";
     }

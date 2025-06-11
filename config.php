@@ -121,19 +121,13 @@ function formatPhoneUG($phone) {
 }
 
 // ==================== APP CONSTANTS ====================
-if (!defined('APP_NAME')) { // Define if not already defined (e.g. by the top diagnostic block)
+if (!defined('APP_NAME')) { // Define if not already defined
     define('APP_NAME', 'Rukindo Kweyamba Savings Group');
 }
-if (!defined('BASE_URL')) { // Define if not already defined
-     // Basic fallback, ensure it ends with a slash.
-    $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' || $_SERVER['SERVER_PORT'] == 443) ? "https://" : "http://";
-    $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-    $base_path_segment = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
-    if (basename($base_path_segment) === 'config') { // If config.php is in a 'config' subdir
-        $base_path_segment = dirname($base_path_segment);
-    }
-    define('BASE_URL', $protocol . $host . rtrim($base_path_segment, '/\\') . '/');
-}
+// Ensure this line is active (uncommented) and replaces any dynamic BASE_URL definition for this test.
+define('BASE_URL', 'http://localhost/savingssystem/');   ///uncomment this in dev environment
+error_log("DEBUG config.php: BASE_URL successfully defined as: " . BASE_URL); // <-- ADDED LINE
+
 define('MAX_LOGIN_ATTEMPTS', 5);
 define('LOCKOUT_TIME', 15 * 60); // 15 minutes
 
