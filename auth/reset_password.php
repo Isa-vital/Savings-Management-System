@@ -9,7 +9,8 @@ require_once __DIR__ . '/../config.php'; // Provides $pdo, BASE_URL, APP_NAME, p
 $page_title = "Reset Password";
 $errors = [];
 $success_message = '';
-$token = filter_input(INPUT_GET, 'token', FILTER_SANITIZE_STRING); // Sanitize GET token
+$token = filter_input(INPUT_GET, 'token', FILTER_DEFAULT); // basic get with no sanitization
+
 $show_form = false;
 $user_id_from_token = null; // To store user ID if token is initially valid
 
