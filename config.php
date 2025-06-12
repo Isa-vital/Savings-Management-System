@@ -37,7 +37,7 @@ try {
     );
 } catch (PDOException $e) {
     error_log("DB Connection Failed: " . $e->getMessage());
-    die("System temporarily unavailable. Staff notified.");
+    die("Oops! Something went wrong. Please try again later.\n Seems like we are having trouble connecting to the database.");
 }
 
 // ==================== ESSENTIAL FUNCTIONS ====================
