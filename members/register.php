@@ -190,14 +190,14 @@ $sa_admin_reg_success_title = '';
 $sa_admin_reg_success_html = '';
 if (isset($_SESSION['success']) && $_SESSION['success'] === true) {
     $sa_admin_reg_success_title = 'Registration Successful!';
-    $sa_admin_reg_success_html = <<<HTML
-        <div class="text-center">
-            <i class="fas fa-check-circle text-success mb-3" style="font-size: 4rem;"></i>
-            <h4>Member Registered Successfully</h4>
-            <p>Name: <strong>{htmlspecialchars($_SESSION['member_name'] ?? 'N/A')}</strong></p>
-            <p>Member Number: <strong>{htmlspecialchars($_SESSION['member_number'] ?? 'N/A')}</strong></p>
-        </div>
-HTML;
+$sa_admin_reg_success_html = '
+    <div class="text-center">
+        <i class="fas fa-check-circle text-success mb-3" style="font-size: 4rem;"></i>
+        <h4>Member Registered Successfully</h4>
+        <p>Name: <strong>' . htmlspecialchars($_SESSION['member_name'] ?? 'N/A') . '</strong></p>
+        <p>Member Number: <strong>' . htmlspecialchars($_SESSION['member_number'] ?? 'N/A') . '</strong></p>
+    </div>
+';
     unset($_SESSION['success']);
     unset($_SESSION['member_number']);
     unset($_SESSION['member_name']);
@@ -405,39 +405,27 @@ HTML;
         document.addEventListener('DOMContentLoaded', function() {
             <?php if (!empty($sa_admin_reg_success_html)): ?>
             Swal.fire({
-<<<<<<< HEAD
-                title: '',
-                html: `
-                    <div class="text-center">
-                        <i class="fas fa-check-circle text-success mb-3" style="font-size: 4rem;"></i>
-                        <h4>Member Registered Successfully</h4>
-                        <p>Name: <strong><?= htmlspecialchars($_SESSION['member_name']) ?></strong></p>
-                        <p>Member Number: <strong><?= htmlspecialchars($_SESSION['member_number']) ?></strong></p>
-                    </div>
-                `,
-=======
-                title: '<?php echo addslashes($sa_admin_reg_success_title); ?>',
-                html: `<?php echo addslashes($sa_admin_reg_success_html); ?>`,
->>>>>>> fae297eec5a53500d5bda68acce40832ef0b4522
-                icon: 'success',
-                confirmButtonText: 'Register Another', // Changed from 'Continue'
-                showCancelButton: true,
-                cancelButtonText: 'View Members List',
-                cancelButtonColor: '#6c757d'
-            }).then((result) => {
-                if (result.dismiss === Swal.DismissReason.cancel) { // If "View Members List" is clicked
-                    window.location.href = 'memberslist.php';
-                }
-                // If "Register Another" is clicked, or popup is dismissed by other means, just stay on page / default behavior.
-                // The form would be clear for new entry unless values are sticky.
-                // The original page reloads/redirects to itself, which clears POST.
-                // If user clicks "Register Another", they can fill the form again.
-                // The fetch('clearsession.php') might not be needed if session vars are unset in PHP.
-                // For now, keeping it if it serves a broader purpose.
-                fetch('clearsession.php?clear=success')
-                    .then(response => response.text())
-                    .then(data => console.log('Session clear attempt: ' + data));
-            });
+    title: '<?php echo addslashes($sa_admin_reg_success_title); ?>',
+    html: `<?php echo addslashes($sa_admin_reg_success_html); ?>`,
+    icon: 'success',
+    confirmButtonText: 'Register Another Member', // Changed from 'Continue'
+    showCancelButton: true,
+    cancelButtonText: 'View Members List',
+    cancelButtonColor: '#6c757d'
+}).then((result) => {
+    if (result.dismiss === Swal.DismissReason.cancel) { // If "View Members List" is clicked
+        window.location.href = 'memberslist.php';
+    }
+    // If "Register Another" is clicked, or popup is dismissed by other means, just stay on page / default behavior.
+    // The form would be clear for new entry unless values are sticky.
+    // The original page reloads/redirects to itself, which clears POST.
+    // If user clicks "Register Another", they can fill the form again.
+    // The fetch('clearsession.php') might not be needed if session vars are unset in PHP.
+    // For now, keeping it if it serves a broader purpose.
+    fetch('clearsession.php?clear=success')
+        .then(response => response.text())
+        .then(data => console.log('Session clear attempt: ' + data));
+});
             <?php endif; ?>
 
             <?php if (!empty($page_error_for_sweetalert)): ?>

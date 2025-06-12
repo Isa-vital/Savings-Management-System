@@ -1,6 +1,18 @@
 <?php
-session_start();
-require_once __DIR__ . '/../config.php';
+// config.php should be the first include to define BASE_URL, APP_NAME and start the session.
+require_once __DIR__ . '/../config.php'; 
+require_once __DIR__ . '/../helpers/auth.php';
+
+require_login(); // Ensures user is logged in
+
+// Restrict access to Admins
+if (!has_role(['Core Admin', 'Administrator'])) {
+    $_SESSION['error_message'] = "You do not have permission to access this page.";
+    header("Location: " . BASE_URL . "index.php"); // Or landing.php
+    exit;
+}
+?>
+<?php
 
 $limit = 10; // records per page
 $page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
@@ -32,36 +44,12 @@ $savings = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <title>All Savings Records</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-    <style>
-        .uganda-flag {
-            background: linear-gradient(to right, 
-                #000 0%, #000 33%, 
-                #FFC90D 33%, #FFC90D 66%, 
-                #DE2010 66%, #DE2010 100%);
-            height: 5px;
-            margin-bottom: 20px;
-        }
-        .total-savings {
-            font-weight: bold;
-            color: #28a745;
-        }
-        .action-btns .btn {
-            padding: 0.25rem 0.5rem;
-            font-size: 0.875rem;
-        }
-        .table-responsive {
-            overflow-x: auto;
-        }
-        .search-box {
-            max-width: 400px;
-        }
-    </style>
 </head>
 <body>
-<?php include '../partials/navbar.php'; ?>
+<?php include __DIR__ . '/../partials/navbar.php'; ?>
 <div class="container-fluid">
     <div class="row">
-        <?php include '../partials/sidebar.php'; ?>
+        <?php include __DIR__ . '/../partials/sidebar.php'; ?>
         <main class="col-md-9 ms-sm-auto px-md-4 py-4">
             <h1 class="h4 mb-4"><i class="fas fa-list me-2"></i> All Savings Records</h1>
 
@@ -72,11 +60,8 @@ $savings = $stmt->fetchAll(PDO::FETCH_ASSOC);
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <input type="text" id="searchInput" class="form-control w-25" placeholder="Search...">
                 <div>
-                   
-                    <a href="savings.php" class="btn btn-sm btn-outline-success me-2">
-                            <i class="fas fa-money-bill-wave me-2"></i>Add Savings
-                        </a>
-                    <button onclick="exportCSV()" class="btn btn-sm btn-outline-success me-2"> Export CSV</button>
+                    
+                    <button onclick="exportCSV()" class="btn btn-sm btn-outline-success me-2">Export CSV</button>
                     <button onclick="downloadPDF()" class="btn btn-sm btn-outline-primary">Download PDF</button>
                 </div>
             </div>
@@ -168,6 +153,6 @@ $savings = $stmt->fetchAll(PDO::FETCH_ASSOC);
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<?php require_once '../partials/footer.php'; ?>
+<?php include __DIR__ . '/../partials/footer.php'; ?>
 </body>
 </html>

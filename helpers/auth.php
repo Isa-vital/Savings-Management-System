@@ -140,6 +140,9 @@ function can(string $permission): bool {
             // Example: Members and Administrators can view reports.
             return has_role(['Administrator', 'Member']);
         // Add more cases for other permissions as the system grows
+        case 'edit_profile':
+            // Example: All logged-in users can edit their own profile.
+            return has_role(['Member', 'Administrator', 'Core Admin']);
         default:
             // By default, deny unknown permissions for non-Core Admins.
             return false;

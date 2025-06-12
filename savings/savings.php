@@ -1,14 +1,18 @@
 <?php
-session_start();
+// config.php should be the first include to define BASE_URL, APP_NAME and start the session.
+require_once __DIR__ . '/../config.php'; 
+require_once __DIR__ . '/../helpers/auth.php';
 
-if (!isset($_SESSION['admin']['id'])) {
-    $_SESSION['error'] = "Unauthorized access";
-    header('Location: ../auth/login.php');
+require_login(); // Ensures user is logged in
+
+// Restrict access to Admins
+if (!has_role(['Core Admin', 'Administrator'])) {
+    $_SESSION['error_message'] = "You do not have permission to access this page.";
+    header("Location: " . BASE_URL . "index.php"); // Or landing.php
     exit;
 }
-
-require_once __DIR__ . '/../config.php';
-
+?>
+<?php
 function generateReceiptNo($pdo) {
     $today = date('Ymd');
     $prefix = "RCPT-$today-";
@@ -20,6 +24,7 @@ function generateReceiptNo($pdo) {
 
     return $prefix . str_pad($count, 4, '0', STR_PAD_LEFT);
 }
+
 
 try {
     // Fetch all members for the dropdown
@@ -55,11 +60,10 @@ if ($selected_member_id) {
 
                     $notes = $_POST['notes'] ?? '';
 
-                    if ($amount <= 1999 || empty($date)) {
-                        throw new Exception("Amount or date is invalid, can't be less than 2000!");
+                    if ($amount <= 0 || empty($date)) {
+                        throw new Exception("Amount and date are required.");
                     }
 
-                    // Insert into savings table
                     $stmt = $pdo->prepare("INSERT INTO savings 
                         (member_id, amount, date, receipt_no, notes) 
                         VALUES (:member_id, :amount, :date, :receipt_no, :notes)");
@@ -69,18 +73,6 @@ if ($selected_member_id) {
                         ':date' => $date,
                         ':receipt_no' => $receipt_no,
                         ':notes' => $notes
-                    ]);
-
-                    // Insert into transactions table
-                    $stmt2 = $pdo->prepare("INSERT INTO transactions 
-                        (member_id, amount, transaction_type, transaction_date, reference) 
-                        VALUES (:member_id, :amount, :type, :transaction_date, :reference)");
-                    $stmt2->execute([
-                        ':member_id' => $selected_member_id,
-                        ':amount' => $amount,
-                        ':type' => 'deposit',
-                        ':transaction_date' => $date,
-                        ':reference' => $receipt_no
                     ]);
 
                     $pdo->commit();
@@ -94,7 +86,7 @@ if ($selected_member_id) {
                 }
             }
 
-            // Fetch savings for the selected member
+            // Fetch savings
             $stmt = $pdo->prepare("SELECT * FROM savings WHERE member_id = :id ORDER BY date DESC");
             $stmt->execute([':id' => $selected_member_id]);
             $savings = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -114,10 +106,10 @@ if ($selected_member_id) {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body>
-<?php include '../partials/navbar.php'; ?>
+<?php include __DIR__ . '/../partials/navbar.php'; ?>
 <div class="container-fluid">
     <div class="row">
-        <?php include '../partials/sidebar.php'; ?>
+        <?php include __DIR__ . '/../partials/sidebar.php'; ?>
 
         <main class="col-md-9 ms-sm-auto px-md-4 py-4">
             <h1 class="h4 mb-4"><i class="fas fa-wallet me-2"></i> Manage Member Savings</h1>
@@ -165,7 +157,7 @@ if ($selected_member_id) {
                                     <input type="hidden" name="member_id" value="<?= $selected_member_id ?>">
                                     <div class="mb-3">
                                         <label class="form-label">Amount (UGX)</label>
-                                        <input type="number" name="amount" class="form-control" min="2000" step="100" required>
+                                        <input type="number" name="amount" class="form-control" min="1000" step="100" required>
                                     </div>
                                     <div class="mb-3">
                                         <label class="form-label">Date</label>
@@ -194,6 +186,7 @@ if ($selected_member_id) {
                                                 <th>Date</th>
                                                 <th>Amount</th>
                                                 <th>Receipt</th>
+                                                
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -202,13 +195,14 @@ if ($selected_member_id) {
                                                     <td><?= htmlspecialchars($s['date']) ?></td>
                                                     <td>UGX <?= number_format($s['amount'], 2) ?></td>
                                                     <td>
-                                                        <?= htmlspecialchars($s['receipt_no'] ?: 'N/A') ?>
-                                                        <?php if ($s['receipt_no']): ?>
-                                                            <a href="printreceipt.php?receipt_no=<?= urlencode($s['receipt_no']) ?>" target="_blank" class="btn btn-sm btn-outline-primary ms-2">
-                                                                <i class="fas fa-print"></i> Print
-                                                            </a>
-                                                        <?php endif; ?>
-                                                    </td>
+    <?= htmlspecialchars($s['receipt_no'] ?: 'N/A') ?>
+    <?php if ($s['receipt_no']): ?>
+        <a href="<?= htmlspecialchars(BASE_URL . 'savings/printreceipt.php?receipt_no=' . urlencode($s['receipt_no'])) ?>" target="_blank" class="btn btn-sm btn-outline-primary ms-2">
+            <i class="fas fa-print" onclick="downloadPDF()"></i> Print
+        </a>
+    <?php endif; ?>
+</td>
+
                                                 </tr>
                                             <?php endforeach; ?>
                                         </tbody>
@@ -223,6 +217,22 @@ if ($selected_member_id) {
     </div>
 </div>
 
+
+<script>
+function downloadPDF() {
+  const element = document.getElementById('receipt');
+  const opt = {
+    margin:       0.5,
+    filename:     'Savings_Receipt_<?= htmlspecialchars($receipt['receipt_no']) ?>.pdf',
+    image:        { type: 'jpeg', quality: 0.98 },
+    html2canvas:  { scale: 2 },
+    jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+  };
+  html2pdf().set(opt).from(element).save();
+}
+</script>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<?php include __DIR__ . '/../partials/footer.php'; ?>
 </body>
 </html>

@@ -169,6 +169,22 @@ try {
     header('Location: ../members/memberslist.php');
     exit();
 }
+/**
+ * Fetches the full name or username of a user by their ID.
+ * @param PDO $pdo
+ * @param int $user_id
+ * @return string
+ */
+function getUserNameById($pdo, $user_id) {
+    if (empty($user_id)) return 'Unknown';
+    $stmt = $pdo->prepare("SELECT full_name, username FROM users WHERE id = :id LIMIT 1");
+    $stmt->execute([':id' => $user_id]);
+    $user = $stmt->fetch(PDO::FETCH_ASSOC);
+    if ($user) {
+        return !empty($user['full_name']) ? $user['full_name'] : $user['username'];
+    }
+    return 'Unknown';
+}
 ?>
 
 <!DOCTYPE html>

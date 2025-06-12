@@ -46,18 +46,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             if ($action === 'add_to_group' && $user_id && $role_id) {
                 // UPSERT: Add user or update their role if they are already in the group
-                $stmt = $pdo->prepare("INSERT INTO user_group_roles (user_id, group_id, role_id)
+                $stmt = $pdo->prepare("INSERT INTO user_group_roles (user_id, group_id, role_id) 
                                        VALUES (:user_id, :group_id, :role_id)
-                                       ON DUPLICATE KEY UPDATE role_id = :role_id");
+                                       ON DUPLICATE KEY UPDATE role_id = VALUES(role_id)");
                 $stmt->execute(['user_id' => $user_id, 'group_id' => $selected_group_id, 'role_id' => $role_id]);
                 $_SESSION['success_message'] = "User successfully added to group or role updated.";
             } elseif ($action === 'update_role_in_group' && $user_id && $role_id) {
-                $stmt = $pdo->prepare("UPDATE user_group_roles SET role_id = :role_id
+                $stmt = $pdo->prepare("UPDATE user_group_roles SET role_id = :role_id 
                                        WHERE user_id = :user_id AND group_id = :group_id");
                 $stmt->execute(['role_id' => $role_id, 'user_id' => $user_id, 'group_id' => $selected_group_id]);
                 $_SESSION['success_message'] = "User's role updated successfully in the group.";
             } elseif ($action === 'remove_from_group' && $user_id) {
-                $stmt = $pdo->prepare("DELETE FROM user_group_roles
+                $stmt = $pdo->prepare("DELETE FROM user_group_roles 
                                        WHERE user_id = :user_id AND group_id = :group_id");
                 $stmt->execute(['user_id' => $user_id, 'group_id' => $selected_group_id]);
                 $_SESSION['success_message'] = "User removed from group successfully.";

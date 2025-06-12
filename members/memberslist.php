@@ -204,7 +204,8 @@ try {
                                                 <td><?= htmlspecialchars($member['full_name']) ?></td>
                                                 <td><?= htmlspecialchars($member['phone']) ?></td>
                                                 <td><?= htmlspecialchars($member['gender']) ?></td>
-                                                <td><?= htmlspecialchars($member['occupation']) ?></td>
+                                              <td><?= htmlspecialchars($member['occupation'] ?? '') ?></td>
+
                                                 <td class="text-end total-savings">
                                                     UGX <?= number_format($member['total_savings'], 2) ?>
                                                 </td>

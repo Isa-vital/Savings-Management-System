@@ -1,6 +1,5 @@
 <?php
 // Session is expected to be started by config.php
-// session_start();
 require_once __DIR__ . '/config.php'; // Ensures $pdo, BASE_URL, APP_NAME
 require_once __DIR__ . '/helpers/auth.php'; // For require_login, has_role
 
@@ -9,17 +8,23 @@ require_login(); // Ensures user is logged in, redirects to login if not.
 // Role check: Reports should be for admins
 if (!has_role(['Core Admin', 'Administrator'])) {
     $_SESSION['error_message'] = "You do not have permission to view reports.";
-    // Redirect to a safe page, like user's dashboard or landing page
-    if (has_role('Member') && isset($_SESSION['user']['member_id'])) {
-        header("Location: " . BASE_URL . "members/my_savings.php");
-    } else {
-        header("Location: " . BASE_URL . "landing.php");
-    }
+    // Redirect to a safe page
+    header("Location: " . BASE_URL . (has_role('Member') ? "members/my_savings.php" : "landing.php"));
     exit;
 }
 
-// $pdo is already available from config.php
-$members = [];
+// Initialize all filter variables with safe defaults
+$report_type = $_GET['report_type'] ?? 'savings';  // Default to savings report
+$from_date = $_GET['from_date'] ?? date('Y-m-01'); // Default to start of current month
+$to_date = $_GET['to_date'] ?? date('Y-m-d');      // Default to today
+$member_id = $_GET['member_id'] ?? null;
+$status_filter = $_GET['status'] ?? null;
+
+// Validate report type
+$valid_report_types = ['savings', 'loans', 'members'];
+if (!in_array($report_type, $valid_report_types)) {
+    $report_type = 'savings'; // Fallback to default
+}
 
 // Get all members for dropdown
 try {
@@ -29,6 +34,10 @@ try {
     error_log("Member query failed: ".$e->getMessage());
     $members = [];
 }
+
+// Initialize report data
+$data = [];
+$summary = [];
 
 // Process report data
 try {
@@ -44,9 +53,9 @@ try {
                 ':to_date' => $to_date
             ];
 
-            if ($member_id) {
+            if ($member_id && is_numeric($member_id)) {
                 $query .= " AND s.member_id = :member_id";
-                $params[':member_id'] = $member_id;
+                $params[':member_id'] = (int)$member_id;
             }
 
             $query .= " ORDER BY s.date DESC";
@@ -77,12 +86,12 @@ try {
                 ':to_date' => $to_date
             ];
 
-            if ($member_id) {
+            if ($member_id && is_numeric($member_id)) {
                 $query .= " AND l.member_id = :member_id";
-                $params[':member_id'] = $member_id;
+                $params[':member_id'] = (int)$member_id;
             }
 
-            if ($status_filter) {
+            if ($status_filter && in_array($status_filter, ['pending', 'approved', 'rejected'])) {
                 $query .= " AND l.status = :status";
                 $params[':status'] = $status_filter;
             }
@@ -120,18 +129,54 @@ try {
             $stmt->execute();
             $data = $stmt->fetchAll();
             break;
-
-        default:
-            die("Invalid report type");
     }
 } catch (PDOException $e) {
-    $_SESSION['error'] = "Error: " . $e->getMessage();
+    error_log("Report generation failed: " . $e->getMessage());
+    $_SESSION['error_message'] = "Error generating report. Please try again.";
 }
 ?>
 
-
-<!-- Navbar should be included for consistent layout -->
-<?php include __DIR__ . '/partials/navbar.php'; ?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><?= htmlspecialchars(APP_NAME) ?> - Dashboard</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Custom CSS -->
+    <style>
+        .stat-card {
+            transition: transform 0.3s;
+            border-left: 4px solid;
+        }
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        }
+        .stat-card.members {
+            border-left-color: #4e73df;
+        }
+        .stat-card.savings {
+            border-left-color: #1cc88a;
+        }
+        .stat-card.loans {
+            border-left-color: #f6c23e;
+        }
+        .recent-transactions {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <?php include 'partials/navbar.php'; ?>
 
 <div class="container-fluid">
     <div class="row">

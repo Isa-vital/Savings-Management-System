@@ -162,7 +162,14 @@ if(isset($_SESSION['success_message'])) unset($_SESSION['success_message']);
                                                 <td><?php echo htmlspecialchars($loan['loan_number']); ?></td>
                                                 <td><?php echo htmlspecialchars($loan['applicant_name']); ?></td>
                                                 <td class="text-end"><?php echo htmlspecialchars(number_format($loan['amount_applied'], 2)); ?></td>
-                                                <td><?php echo htmlspecialchars(date('d M Y', strtotime($loan['application_date']))); ?></td>
+                                               <td>
+    <?= htmlspecialchars(
+        !empty($loan['application_date']) && strtotime($loan['application_date']) 
+            ? date('d M Y', strtotime($loan['application_date'])) 
+            : 'N/A'
+    ) ?>
+</td>
+
                                                 <td>
                                                     <?php
                                                     $status_badge = 'secondary'; // Default
