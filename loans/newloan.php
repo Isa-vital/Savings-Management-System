@@ -1,14 +1,23 @@
 <?php
-session_start(); 
-if (!isset($_SESSION['admin']['id'])) {
-    $_SESSION['error'] = "Unauthorized access";
-    header('Location: ../auth/login.php');
+require_once __DIR__ . '/../config.php';      // For $pdo, BASE_URL, APP_NAME, sanitize()
+require_once __DIR__ . '/../helpers/auth.php';
+
+require_login(); // Redirects if not logged in
+
+// Only allow access for Core Admins and Administrators
+if (!has_role(['Core Admin', 'Administrator'])) {
+    $_SESSION['error_message'] = "You do not have permission to access this page.";
+
+    // Redirect based on role
+    if (has_role('Member') && isset($_SESSION['user']['member_id'])) {
+        header("Location: " . BASE_URL . "members/my_savings.php");
+    } else {
+        header("Location: " . BASE_URL . "landing.php");
+    }
     exit;
 }
 
-// Initialize session and check authentication
-require_once __DIR__ . '/../config.php';
-require_once __DIR__ . '/../includes/database.php';
+// Page content for Core Admins and Administrators continues below...
 
 // Initialize variables
 $error = '';

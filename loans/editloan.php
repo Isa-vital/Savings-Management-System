@@ -1,20 +1,20 @@
 <?php
-session_start();
-
-if (!isset($_SESSION['admin']['id'])) {
-    $_SESSION['error'] = "Unauthorized access";
-    header('Location: ../auth/login.php');
-    exit;
-}
-
-require_once __DIR__ . '/../config.php';
-require_once '../helpers/auth.php';
+require_once __DIR__ . '/../config.php';      // For $pdo, BASE_URL, APP_NAME, sanitize()
+require_once __DIR__ . '/../helpers/auth.php';
 require_once '../helpers/loans.php'; // For createRepaymentSchedule()
 
-// Check if loan ID is provided
-if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
-    $_SESSION['error'] = "Invalid loan ID";
-    header('Location: loanslist.php');
+require_login(); // Redirects if not logged in
+
+// Only allow access for Core Admins and Administrators
+if (!has_role(['Core Admin', 'Administrator'])) {
+    $_SESSION['error_message'] = "You do not have permission to access this page.";
+
+    // Redirect based on role
+    if (has_role('Member') && isset($_SESSION['user']['member_id'])) {
+        header("Location: " . BASE_URL . "members/my_savings.php");
+    } else {
+        header("Location: " . BASE_URL . "landing.php");
+    }
     exit;
 }
 

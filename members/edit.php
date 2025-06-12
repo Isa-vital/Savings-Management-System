@@ -1,25 +1,27 @@
 <?php
-// Session is expected to be started by config.php
-// session_start();
-
 require_once __DIR__ . '/../config.php';      // For $pdo, BASE_URL, APP_NAME, sanitize()
-require_once __DIR__ . '/../helpers/auth.php'; // For require_login(), has_role()
+require_once __DIR__ . '/../helpers/auth.php';
 
-require_login(); // Redirects to login if not authenticated
+require_login(); // Redirects if not logged in
 
+// Only allow access for Core Admins and Administrators
 if (!has_role(['Core Admin', 'Administrator'])) {
     $_SESSION['error_message'] = "You do not have permission to access this page.";
-    // Redirect to a safe page, like user's dashboard or landing page
+
+    // Redirect based on role
     if (has_role('Member') && isset($_SESSION['user']['member_id'])) {
         header("Location: " . BASE_URL . "members/my_savings.php");
     } else {
-        header("Location: " . BASE_URL . "landing.php"); // Or index.php if landing is not for logged-in users
+        header("Location: " . BASE_URL . "landing.php");
     }
     exit;
 }
+// Set page title
+$page_title = "Edit Member - " . APP_NAME;
 
-// $pdo is available from config.php
-// sanitize() is assumed to be available from config.php or helpers/auth.php (config.php is more likely)
+// Page content for Core Admins and Administrators continues below...
+
+// Page content for Core Admins and Administrators continues below...
 
 // Check if member ID is provided
 if (!isset($_GET['member_no'])) {
@@ -130,6 +132,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ]);
         
         $pdo->commit();
+        
+        // Log the update action
+        error_log("Member {$member_no} updated by admin {$_SESSION['user']['id']}");
+        
         $_SESSION['success'] = "Member updated successfully";
         header('Location: view.php?member_no=' . $member_no);
         exit;
@@ -159,7 +165,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Edit Member - Ugandan SACCO</title>
+    <title>Edit Member - <?= htmlspecialchars(APP_NAME) ?></title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -174,6 +180,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         .required-field::after {
             content: " *";
             color: #DE2010;
+        }
+        .member-info-card {
+            background-color: #f8f9fa;
+            border-left: 4px solid #0d6efd;
         }
     </style>
 </head>
@@ -204,16 +214,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 <div class="card shadow">
                     <div class="card-body">
-                        <form method="POST">
-                            <div class="row mb-4">
-                                <div class="col-md-12">
-                                    <div class="alert alert-info">
-                                        <i class="fas fa-id-card me-2"></i>
-                                        Member Number: <strong><?= htmlspecialchars($member['member_no']) ?></strong>
+                        <div class="row mb-4">
+                            <div class="col-md-12">
+                                <div class="member-info-card p-3 mb-4">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <h5 class="mb-1">
+                                                <i class="fas fa-id-card me-2"></i>
+                                                Member: <?= htmlspecialchars($member['member_no']) ?>
+                                            </h5>
+                                            <p class="mb-0 text-muted">
+                                                Last updated: <?= date('M j, Y', strtotime($member['updated_at'] ?? $member['created_at'])) ?>
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <a href="../savings/savings.php?member_no=<?= urlencode($member['member_no']) ?>" 
+                                               class="btn btn-sm btn-warning">
+                                                <i class="fas fa-wallet me-1"></i> Manage Savings
+                                            </a>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
+                        </div>
 
+                        <form method="POST" novalidate>
                             <h5 class="mb-4 text-primary">
                                 <i class="fas fa-id-card me-2"></i>Personal Information
                             </h5>
@@ -353,32 +378,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         document.querySelector('input[name="next_of_kin_contact"]').addEventListener('input', function(e) {
             this.value = this.value.replace(/[^0-9]/g, '');
         });
+        
+        // Form validation feedback
+        document.querySelector('form').addEventListener('submit', function(e) {
+            if (!this.checkValidity()) {
+                e.preventDefault();
+                this.classList.add('was-validated');
+            }
+        });
     </script>
-
-    <!---update successfull popup modal-->
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Show Bootstrap toast notification
-    const successToast = new bootstrap.Toast(document.getElementById('successToast'));
-    
-    <?php if (isset($_SESSION['success'])): ?>
-        successToast.show();
-        <?php unset($_SESSION['success']); ?>
-    <?php endif; ?>
-});
-</script>
-
-<!-- Add this toast HTML anywhere in your layout -->
-<div class="position-fixed bottom-0 end-0 p-3" style="z-index: 11">
-    <div id="successToast" class="toast hide" role="alert" aria-live="assertive" aria-atomic="true">
-        <div class="toast-header bg-success text-white">
-            <strong class="me-auto">Success</strong>
-            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
-        </div>
-        <div class="toast-body">
-            Member record updated successfully!
-        </div>
-    </div>
-</div>
+    <?php require_once '../partials/footer.php'; ?>
 </body>
 </html>

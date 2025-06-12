@@ -1,12 +1,23 @@
 <?php
-require_once '../includes/database.php';
-require_once '../includes/functions.php';
+require_once __DIR__ . '/../config.php';      // For $pdo, BASE_URL, APP_NAME, sanitize()
+require_once __DIR__ . '/../helpers/auth.php';
 
-// Check if loan ID is provided
-if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
-    die("Invalid loan ID");
+require_login(); // Redirects if not logged in
+
+// Only allow access for Core Admins and Administrators
+if (!has_role(['Core Admin', 'Administrator'])) {
+    $_SESSION['error_message'] = "You do not have permission to access this page.";
+
+    // Redirect based on role
+    if (has_role('Member') && isset($_SESSION['user']['member_id'])) {
+        header("Location: " . BASE_URL . "members/my_savings.php");
+    } else {
+        header("Location: " . BASE_URL . "landing.php");
+    }
+    exit;
 }
 
+// Page content for Core Admins and Administrators continues below...
 $loanId = (int)$_GET['id'];
 
 try {
@@ -61,6 +72,14 @@ try {
 // Set headers for PDF download (optional)
 // header('Content-Type: application/pdf');
 // header('Content-Disposition: attachment; filename="loan_'.$loanId.'_details.pdf"');
+
+// Define getSaccoName() if not already defined
+if (!function_exists('getSaccoName')) {
+    function getSaccoName() {
+        // Replace this with the actual logic to get your SACCO name, e.g. from config or database
+        return defined('APP_NAME') ? APP_NAME : 'SACCO Name';
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">

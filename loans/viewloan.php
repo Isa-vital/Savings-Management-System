@@ -1,21 +1,23 @@
 <?php
-session_start();
+require_once __DIR__ . '/../config.php';      // For $pdo, BASE_URL, APP_NAME, sanitize()
+require_once __DIR__ . '/../helpers/auth.php';
 
-if (!isset($_SESSION['admin']['id'])) {
-    $_SESSION['error'] = "Unauthorized access";
-    header('Location: ../auth/login.php');
+require_login(); // Redirects if not logged in
+
+// Only allow access for Core Admins and Administrators
+if (!has_role(['Core Admin', 'Administrator'])) {
+    $_SESSION['error_message'] = "You do not have permission to access this page.";
+
+    // Redirect based on role
+    if (has_role('Member') && isset($_SESSION['user']['member_id'])) {
+        header("Location: " . BASE_URL . "members/my_savings.php");
+    } else {
+        header("Location: " . BASE_URL . "landing.php");
+    }
     exit;
 }
 
-require_once __DIR__ . '/../config.php';
-require_once '../helpers/auth.php';
-
-// Check if loan ID is provided
-if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
-    $_SESSION['error'] = "Invalid loan ID";
-    header('Location: loanslist.php');
-    exit;
-}
+// Page content for Core Admins and Administrators continues below...
 
 $loan_id = intval($_GET['id']);
 
@@ -28,7 +30,7 @@ try {
                           (l.amount - COALESCE(SUM(lr.amount), 0)) as balance
                           FROM loans l
                           JOIN memberz m ON l.member_id = m.id
-                          LEFT JOIN users u ON l.processed_by = u.user_id
+                          LEFT JOIN users u ON l.processed_by = u.id
                           LEFT JOIN loan_repayments lr ON l.id = lr.loan_id
                           WHERE l.id = :loan_id");
     $stmt->execute([':loan_id' => $loan_id]);
@@ -50,7 +52,7 @@ try {
     // Fetch payment history
     $stmt = $pdo->prepare("SELECT p.*, u.username as received_by 
                           FROM payments p
-                          LEFT JOIN users u ON p.received_by = u.user_id
+                          LEFT JOIN users u ON p.received_by = u.id
                           WHERE p.loan_id = :loan_id
                           ORDER BY payment_date DESC");
     $stmt->execute([':loan_id' => $loan_id]);

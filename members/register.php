@@ -5,6 +5,14 @@
 require_once __DIR__ . '/../config.php';      // For $pdo, BASE_URL, APP_NAME, sanitize()
 require_once __DIR__ . '/../helpers/auth.php'; // For require_login(), has_role()
 
+// Add PHPMailer and email template includes
+require_once __DIR__ . '/../vendor/autoload.php'; // For PHPMailer
+require_once __DIR__ . '/../emails/email_template.php'; // For generateBasicEmailTemplate()
+
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\SMTP;
+use PHPMailer\PHPMailer\Exception;
+
 require_login(); // Redirects to login if not authenticated
 
 if (!has_role(['Core Admin', 'Administrator'])) {
@@ -45,6 +53,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['district'])) {
 }
 
 $page_error_for_sweetalert = ''; // Initialize for SweetAlert
+$sa_success_admin_reg = $_SESSION['success_message_admin_reg'] ?? ''; // For new success message
+if (isset($_SESSION['success_message_admin_reg'])) unset($_SESSION['success_message_admin_reg']);
+
 $error = null; // Ensure $error is initialized for the page
 
 // Process Ugandan member registration
@@ -143,36 +154,121 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         $stmt->execute($params);
         
-        // Check for duplicate entries
+        // Check for duplicate entries or failure
         if ($stmt->rowCount() === 0) {
-            $errorInfo = $stmt->errorInfo();
-            if (isset($errorInfo[1])) {
-                // Check for duplicate NIN or phone
-                if ($errorInfo[1] == 1062) {
-                    if (strpos($errorInfo[2], 'nin_number') !== false) {
-                        throw new Exception("This NIN number is already registered");
+            // This part might be tricky if actual error is a duplicate key violation caught by DB
+            // For now, assume if rowCount is 0, it's a generic failure or caught duplicate.
+            // More specific duplicate checks (NIN, phone) are already handled by DB constraints if set.
+            throw new Exception("Member registration failed. Please check details or contact support if the issue persists.");
+        }
+
+        $new_member_id_from_memberz = $pdo->lastInsertId(); // Get ID of the newly inserted member
+        $user_creation_message_suffix = ""; // To append to final success message
+
+        if (!empty($email)) {
+            // Check if email already exists in users table
+            $stmt_check_email = $pdo->prepare("SELECT id FROM users WHERE email = :email");
+            $stmt_check_email->execute([':email' => $email]);
+            if ($stmt_check_email->fetch()) {
+                $user_creation_message_suffix = " However, a user account could not be automatically created as the email '" . htmlspecialchars($email) . "' is already in use by another system user.";
+                error_log("Admin Member Registration: Member '$full_name' ($member_no) registered, but user account not created. Email '$email' already exists for another user.");
+            } else {
+                // Proceed to create user
+                $generated_username = strtok($email, '@'); 
+                $temp_username = $generated_username;
+                $counter = 1;
+                $stmt_check_username = $pdo->prepare("SELECT id FROM users WHERE username = :username");
+                while (true) {
+                    $stmt_check_username->execute([':username' => $temp_username]);
+                    if (!$stmt_check_username->fetch()) {
+                        $generated_username = $temp_username;
+                        break;
                     }
-                    if (strpos($errorInfo[2], 'phone') !== false) {
-                        throw new Exception("This phone number is already registered");
-                    }
+                    $temp_username = $generated_username . $counter++;
+                }
+
+                $activation_token = bin2hex(random_bytes(32));
+                $token_expires_at = date('Y-m-d H:i:s', strtotime('+24 hours'));
+                $password_placeholder = 'PENDING_ACTIVATION_NO_LOGIN'; // Not directly hashable, just a placeholder
+
+                $stmt_insert_user = $pdo->prepare(
+                    "INSERT INTO users (member_id, username, password_hash, email, phone, is_active, activation_token, token_expires_at, created_at) 
+                     VALUES (:member_id, :username, :password_hash, :email, :phone, 0, :token, :expires_at, NOW())"
+                );
+                $stmt_insert_user->execute([
+                    ':member_id' => $new_member_id_from_memberz,
+                    ':username' => $generated_username,
+                    ':password_hash' => hashPassword($password_placeholder), // Hash the placeholder
+                    ':email' => $email,
+                    ':phone' => $phone, 
+                    ':token' => $activation_token,
+                    ':expires_at' => $token_expires_at
+                ]);
+                $new_user_id = $pdo->lastInsertId();
+
+                $stmt_update_memberz = $pdo->prepare("UPDATE memberz SET user_id = :user_id, is_system_user = 1 WHERE id = :member_id");
+                $stmt_update_memberz->execute([':user_id' => $new_user_id, ':member_id' => $new_member_id_from_memberz]);
+
+                $default_member_role_id = 3; 
+                $default_members_group_id = 2; 
+                $stmt_assign_role = $pdo->prepare("INSERT INTO user_group_roles (user_id, group_id, role_id) VALUES (:user_id, :group_id, :role_id)");
+                $stmt_assign_role->execute([
+                    ':user_id' => $new_user_id,
+                    ':group_id' => $default_members_group_id, // Assuming group ID 2 is 'Members' group
+                    ':role_id' => $default_member_role_id   // Assuming role ID 3 is 'Member'
+                ]);
+                if ($stmt_assign_role->rowCount() == 0) {
+                    throw new Exception("Critical: Failed to assign default role during member registration user creation.");
+                }
+                
+                $activation_link = rtrim(BASE_URL, '/') . '/auth/activate_account.php?token=' . $activation_token;
+                $email_subject = 'Activate Your Account - ' . APP_NAME;
+                $email_body_html = "<p>Hello " . htmlspecialchars($full_name) . ",</p>" .
+                                   "<p>A member account and user profile have been created for you on " . APP_NAME . ".</p>" .
+                                   "<p>Please click the link below to activate your user account and set your password:</p>" .
+                                   "<p><a href='" . $activation_link . "'>" . $activation_link . "</a></p>" .
+                                   "<p>This link is valid for 24 hours.</p>" .
+                                   "<p>Regards,<br>The " . APP_NAME . " Team</p>";
+                $full_email_html = generateBasicEmailTemplate($email_body_html, APP_NAME);
+                
+                $mail = new PHPMailer(true);
+                try {
+                    $mail->SMTPDebug = SMTP::DEBUG_OFF; // Set to DEBUG_SERVER for detailed logs if issues
+                    $mail->isSMTP();
+                    $mail->Host       = SMTP_HOST;
+                    $mail->SMTPAuth   = true;
+                    $mail->Username   = SMTP_USERNAME;
+                    $mail->Password   = SMTP_PASSWORD;
+                    if (defined('SMTP_ENCRYPTION') && SMTP_ENCRYPTION === 'tls') $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+                    elseif (defined('SMTP_ENCRYPTION') && SMTP_ENCRYPTION === 'ssl') $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
+                    else $mail->SMTPSecure = false; // Or PHPMailer::ENCRYPTION_SMTPS if port is 465
+                    $mail->Port       = SMTP_PORT;
+                    $mail->setFrom(MAIL_FROM_EMAIL, MAIL_FROM_NAME);
+                    $mail->addAddress($email, $full_name);
+                    $mail->isHTML(true);
+                    $mail->Subject = $email_subject;
+                    $mail->Body    = $full_email_html;
+                    $mail->AltBody = strip_tags(str_replace(["<p>", "</p>", "<br>"], ["", "\n", "\n"], $email_body_html)); // Basic conversion
+                    $mail->send();
+                    $user_creation_message_suffix = " A user account was created, and an activation email has been sent to " . htmlspecialchars($email) . ".";
+                } catch (Exception $e_mail) { // PHPMailer Exception
+                    error_log("PHPMailer Error (Admin Member Registration for " . $email . "): " . $mail->ErrorInfo . " (Details: " . $e_mail->getMessage() . ")");
+                    $user_creation_message_suffix = " A user account was created, but the activation email could not be sent. Please contact support or convert user manually. Activation link for testing (normally emailed): " . $activation_link;
                 }
             }
-            throw new Exception("Registration failed. Please try again.");
+        } else { // No email provided
+            $user_creation_message_suffix = " No user account was created as no email address was provided for the member.";
         }
         
         // Commit transaction
         $pdo->commit();
         
-        // Set success session variables
-        $_SESSION['success'] = true;
-        $_SESSION['member_number'] = $member_no;
-        $_SESSION['member_name'] = $full_name;
-        
-        // Redirect back to show success message
-        redirect('register.php');
+        $_SESSION['success_message_admin_reg'] = "Member '" . htmlspecialchars($full_name) . "' (No: " . htmlspecialchars($member_no) . ") registered successfully." . $user_creation_message_suffix;
+        header("Location: " . BASE_URL . "members/register.php"); // Redirect to clear POST and show message
+        exit;
         
     } catch (PDOException $e) {
-        $pdo->rollBack();
+        if (isset($pdo) && $pdo->inTransaction()) { $pdo->rollBack(); }
         error_log("Database error: " . $e->getMessage());
         $error = "A database error occurred. Please try again.";
         $page_error_for_sweetalert = $error; // Capture for SweetAlert
@@ -185,23 +281,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// Prepare success message data for SweetAlert, and unset session vars
-$sa_admin_reg_success_title = '';
-$sa_admin_reg_success_html = '';
-if (isset($_SESSION['success']) && $_SESSION['success'] === true) {
-    $sa_admin_reg_success_title = 'Registration Successful!';
-$sa_admin_reg_success_html = '
-    <div class="text-center">
-        <i class="fas fa-check-circle text-success mb-3" style="font-size: 4rem;"></i>
-        <h4>Member Registered Successfully</h4>
-        <p>Name: <strong>' . htmlspecialchars($_SESSION['member_name'] ?? 'N/A') . '</strong></p>
-        <p>Member Number: <strong>' . htmlspecialchars($_SESSION['member_number'] ?? 'N/A') . '</strong></p>
-    </div>
-';
-    unset($_SESSION['success']);
-    unset($_SESSION['member_number']);
-    unset($_SESSION['member_name']);
-}
+// Prepare success message data for SweetAlert (already handled by $sa_success_admin_reg initialization)
 ?>
 
 <!DOCTYPE html>
@@ -228,7 +308,7 @@ $sa_admin_reg_success_html = '
             color: #DE2010;
         }
         .form-control:invalid, .form-select:invalid {
-            border-color: #dc3545;
+            border-color: #dc3545; /* Bootstrap's danger color */
         }
         .member-no-display {
             background-color: #f8f9fa;
@@ -241,11 +321,11 @@ $sa_admin_reg_success_html = '
     </style>
 </head>
 <body>
-    <?php include '../partials/navbar.php'; ?>
+    <?php include __DIR__ . '/../partials/navbar.php'; ?>
     
     <div class="container-fluid">
         <div class="row">
-            <?php include '../partials/sidebar.php'; ?>
+            <?php include __DIR__ . '/../partials/sidebar.php'; ?>
             
             <main class="col-md-9 ms-sm-auto px-md-4 py-4">
                 <div class="uganda-flag"></div>
@@ -403,29 +483,16 @@ $sa_admin_reg_success_html = '
     
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            <?php if (!empty($sa_admin_reg_success_html)): ?>
+            <?php if (!empty($sa_success_admin_reg)): ?>
             Swal.fire({
-    title: '<?php echo addslashes($sa_admin_reg_success_title); ?>',
-    html: `<?php echo addslashes($sa_admin_reg_success_html); ?>`,
-    icon: 'success',
-    confirmButtonText: 'Register Another Member', // Changed from 'Continue'
-    showCancelButton: true,
-    cancelButtonText: 'View Members List',
-    cancelButtonColor: '#6c757d'
-}).then((result) => {
-    if (result.dismiss === Swal.DismissReason.cancel) { // If "View Members List" is clicked
-        window.location.href = 'memberslist.php';
-    }
-    // If "Register Another" is clicked, or popup is dismissed by other means, just stay on page / default behavior.
-    // The form would be clear for new entry unless values are sticky.
-    // The original page reloads/redirects to itself, which clears POST.
-    // If user clicks "Register Another", they can fill the form again.
-    // The fetch('clearsession.php') might not be needed if session vars are unset in PHP.
-    // For now, keeping it if it serves a broader purpose.
-    fetch('clearsession.php?clear=success')
-        .then(response => response.text())
-        .then(data => console.log('Session clear attempt: ' + data));
-});
+                icon: 'success',
+                title: 'Operation Successful',
+                html: '<?php echo addslashes(str_replace("\n", "<br>", htmlspecialchars($sa_success_admin_reg))); ?>',
+                confirmButtonText: 'OK',
+                // Removed cancel button and redirect to memberslist for simplicity with new combined message
+                // User will stay on the registration page, which is fine.
+            });
+            // No need for fetch('clearsession.php?clear=success') as session var is unset in PHP.
             <?php endif; ?>
 
             <?php if (!empty($page_error_for_sweetalert)): ?>
@@ -488,5 +555,6 @@ $sa_admin_reg_success_html = '
             }
         });
     </script>
+    <?php include __DIR__ . '/../partials/footer.php'; ?>
 </body>
 </html>
