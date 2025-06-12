@@ -1,14 +1,12 @@
 <?php
-require_once __DIR__ . '/../config.php';      // For $pdo, BASE_URL, APP_NAME, sanitize()
+require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../helpers/auth.php';
 
-require_login(); // Redirects if not logged in
+require_login();
 
 // Only allow access for Core Admins and Administrators
 if (!has_role(['Core Admin', 'Administrator'])) {
     $_SESSION['error_message'] = "You do not have permission to access this page.";
-
-    // Redirect based on role
     if (has_role('Member') && isset($_SESSION['user']['member_id'])) {
         header("Location: " . BASE_URL . "members/my_savings.php");
     } else {
@@ -16,8 +14,6 @@ if (!has_role(['Core Admin', 'Administrator'])) {
     }
     exit;
 }
-
-// Page content for Core Admins and Administrators continues below...
 
 // Initialize variables
 $transactions = [];
@@ -29,7 +25,12 @@ $filters = [
 ];
 
 try {
-    // Build base query
+    // Debug: Verify database connection
+    if (!$pdo) {
+        throw new Exception("Database connection failed");
+    }
+
+    // Build base query - MODIFIED to use proper table joins
     $query = "
         SELECT 
             t.id,
@@ -39,19 +40,16 @@ try {
             t.reference,
             m.full_name,
             m.member_no,
-            CASE 
-                WHEN t.transaction_type = 'loan' THEN l.loan_number
-                ELSE NULL
-            END AS loan_ref
+            l.loan_number AS loan_ref
         FROM transactions t
-        JOIN memberz m ON t.member_id = m.id
+        INNER JOIN memberz m ON t.member_id = m.id
         LEFT JOIN loans l ON t.loan_id = l.id
         WHERE 1=1
     ";
 
     $params = [];
 
-    // Apply filters
+    // Apply filters - MODIFIED to ensure proper parameter binding
     if (!empty($filters['type'])) {
         $query .= " AND t.transaction_type = :type";
         $params[':type'] = $filters['type'];
@@ -59,7 +57,7 @@ try {
 
     if (!empty($filters['member_id'])) {
         $query .= " AND t.member_id = :member_id";
-        $params[':member_id'] = $filters['member_id'];
+        $params[':member_id'] = (int)$filters['member_id'];
     }
 
     if (!empty($filters['start_date']) && !empty($filters['end_date'])) {
@@ -70,22 +68,31 @@ try {
 
     $query .= " ORDER BY t.transaction_date DESC LIMIT 500";
 
+    // Debug: Log the query and parameters
+    error_log("Transaction Query: " . $query);
+    error_log("Query Parameters: " . print_r($params, true));
+
     // Execute query
     $stmt = $pdo->prepare($query);
     $stmt->execute($params);
-    $transactions = $stmt->fetchAll();
+    $transactions = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // Get members for dropdown (use ID!)
+    // Debug: Log query results
+    error_log("Found " . count($transactions) . " transactions");
+
+    // Get members for dropdown
     $memberStmt = $pdo->query("SELECT id, member_no, full_name FROM memberz ORDER BY full_name");
-    $members = $memberStmt->fetchAll();
+    $members = $memberStmt->fetchAll(PDO::FETCH_ASSOC);
 
 } catch (PDOException $e) {
     $_SESSION['error'] = "Database error: " . $e->getMessage();
     error_log("Transactions Error: " . $e->getMessage());
+} catch (Exception $e) {
+    $_SESSION['error'] = "Error: " . $e->getMessage();
+    error_log("General Error: " . $e->getMessage());
 }
 ?>
 
-<!-- HTML starts here -->
 <!DOCTYPE html>
 <html lang="en">
 <head>

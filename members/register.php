@@ -156,9 +156,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         // Check for duplicate entries or failure
         if ($stmt->rowCount() === 0) {
-            // This part might be tricky if actual error is a duplicate key violation caught by DB
-            // For now, assume if rowCount is 0, it's a generic failure or caught duplicate.
-            // More specific duplicate checks (NIN, phone) are already handled by DB constraints if set.
             throw new Exception("Member registration failed. Please check details or contact support if the issue persists.");
         }
 
@@ -173,20 +170,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $user_creation_message_suffix = " However, a user account could not be automatically created as the email '" . htmlspecialchars($email) . "' is already in use by another system user.";
                 error_log("Admin Member Registration: Member '$full_name' ($member_no) registered, but user account not created. Email '$email' already exists for another user.");
             } else {
-                // Proceed to create user
-                $generated_username = strtok($email, '@'); 
-                $temp_username = $generated_username;
-                $counter = 1;
-                $stmt_check_username = $pdo->prepare("SELECT id FROM users WHERE username = :username");
-                while (true) {
-                    $stmt_check_username->execute([':username' => $temp_username]);
-                    if (!$stmt_check_username->fetch()) {
-                        $generated_username = $temp_username;
-                        break;
-                    }
-                    $temp_username = $generated_username . $counter++;
-                }
-
+                // Proceed to create user with email as username
+                $generated_username = $email; // Changed from extracting before @ to using full email
+                
                 $activation_token = bin2hex(random_bytes(32));
                 $token_expires_at = date('Y-m-d H:i:s', strtotime('+24 hours'));
                 $password_placeholder = 'PENDING_ACTIVATION_NO_LOGIN'; // Not directly hashable, just a placeholder
@@ -198,7 +184,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt_insert_user->execute([
                     ':member_id' => $new_member_id_from_memberz,
                     ':username' => $generated_username,
-                    ':password_hash' => hashPassword($password_placeholder), // Hash the placeholder
+                    ':password_hash' => hashPassword($password_placeholder),
                     ':email' => $email,
                     ':phone' => $phone, 
                     ':token' => $activation_token,
@@ -214,8 +200,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt_assign_role = $pdo->prepare("INSERT INTO user_group_roles (user_id, group_id, role_id) VALUES (:user_id, :group_id, :role_id)");
                 $stmt_assign_role->execute([
                     ':user_id' => $new_user_id,
-                    ':group_id' => $default_members_group_id, // Assuming group ID 2 is 'Members' group
-                    ':role_id' => $default_member_role_id   // Assuming role ID 3 is 'Member'
+                    ':group_id' => $default_members_group_id,
+                    ':role_id' => $default_member_role_id
                 ]);
                 if ($stmt_assign_role->rowCount() == 0) {
                     throw new Exception("Critical: Failed to assign default role during member registration user creation.");
@@ -233,7 +219,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 
                 $mail = new PHPMailer(true);
                 try {
-                    $mail->SMTPDebug = SMTP::DEBUG_OFF; // Set to DEBUG_SERVER for detailed logs if issues
+                    $mail->SMTPDebug = SMTP::DEBUG_OFF;
                     $mail->isSMTP();
                     $mail->Host       = SMTP_HOST;
                     $mail->SMTPAuth   = true;
@@ -241,22 +227,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $mail->Password   = SMTP_PASSWORD;
                     if (defined('SMTP_ENCRYPTION') && SMTP_ENCRYPTION === 'tls') $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
                     elseif (defined('SMTP_ENCRYPTION') && SMTP_ENCRYPTION === 'ssl') $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
-                    else $mail->SMTPSecure = false; // Or PHPMailer::ENCRYPTION_SMTPS if port is 465
+                    else $mail->SMTPSecure = false;
                     $mail->Port       = SMTP_PORT;
                     $mail->setFrom(MAIL_FROM_EMAIL, MAIL_FROM_NAME);
                     $mail->addAddress($email, $full_name);
                     $mail->isHTML(true);
                     $mail->Subject = $email_subject;
                     $mail->Body    = $full_email_html;
-                    $mail->AltBody = strip_tags(str_replace(["<p>", "</p>", "<br>"], ["", "\n", "\n"], $email_body_html)); // Basic conversion
+                    $mail->AltBody = strip_tags(str_replace(["<p>", "</p>", "<br>"], ["", "\n", "\n"], $email_body_html));
                     $mail->send();
                     $user_creation_message_suffix = " A user account was created, and an activation email has been sent to " . htmlspecialchars($email) . ".";
-                } catch (Exception $e_mail) { // PHPMailer Exception
+                } catch (Exception $e_mail) {
                     error_log("PHPMailer Error (Admin Member Registration for " . $email . "): " . $mail->ErrorInfo . " (Details: " . $e_mail->getMessage() . ")");
                     $user_creation_message_suffix = " A user account was created, but the activation email could not be sent. Please contact support or convert user manually. Activation link for testing (normally emailed): " . $activation_link;
                 }
             }
-        } else { // No email provided
+        } else {
             $user_creation_message_suffix = " No user account was created as no email address was provided for the member.";
         }
         
@@ -264,24 +250,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdo->commit();
         
         $_SESSION['success_message_admin_reg'] = "Member '" . htmlspecialchars($full_name) . "' (No: " . htmlspecialchars($member_no) . ") registered successfully." . $user_creation_message_suffix;
-        header("Location: " . BASE_URL . "members/register.php"); // Redirect to clear POST and show message
+        header("Location: " . BASE_URL . "members/register.php");
         exit;
         
     } catch (PDOException $e) {
         if (isset($pdo) && $pdo->inTransaction()) { $pdo->rollBack(); }
         error_log("Database error: " . $e->getMessage());
         $error = "A database error occurred. Please try again.";
-        $page_error_for_sweetalert = $error; // Capture for SweetAlert
+        $page_error_for_sweetalert = $error;
     } catch (Exception $e) {
         if (isset($pdo) && $pdo->inTransaction()) {
             $pdo->rollBack();
         }
         $error = $e->getMessage();
-        $page_error_for_sweetalert = $error; // Capture for SweetAlert
+        $page_error_for_sweetalert = $error;
     }
 }
-
-// Prepare success message data for SweetAlert (already handled by $sa_success_admin_reg initialization)
 ?>
 
 <!DOCTYPE html>
@@ -308,7 +292,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             color: #DE2010;
         }
         .form-control:invalid, .form-select:invalid {
-            border-color: #dc3545; /* Bootstrap's danger color */
+            border-color: #dc3545;
         }
         .member-no-display {
             background-color: #f8f9fa;
@@ -335,12 +319,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <i class="fas fa-user-plus me-2"></i>Register New Member
                     </h1>
                 </div>
-
-                <?php /* Old inline error display - to be removed
-                <?php if (isset($error)): ?>
-                    <div class="alert alert-danger"><?= htmlspecialchars($error) ?></div>
-                <?php endif; ?>
-                */ ?>
 
                 <div class="card shadow">
                     <div class="card-body">
@@ -486,13 +464,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <?php if (!empty($sa_success_admin_reg)): ?>
             Swal.fire({
                 icon: 'success',
-                title: 'Operation Successful',
+                title: 'Registration Successful',
                 html: '<?php echo addslashes(str_replace("\n", "<br>", htmlspecialchars($sa_success_admin_reg))); ?>',
                 confirmButtonText: 'OK',
-                // Removed cancel button and redirect to memberslist for simplicity with new combined message
-                // User will stay on the registration page, which is fine.
             });
-            // No need for fetch('clearsession.php?clear=success') as session var is unset in PHP.
             <?php endif; ?>
 
             <?php if (!empty($page_error_for_sweetalert)): ?>
@@ -508,18 +483,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         function generateMemberNumber() {
             const district = document.getElementById('district').value;
             if (district) {
-                // AJAX request to generate member number
                 fetch(window.location.pathname + '?district=' + encodeURIComponent(district))
                     .then(response => response.text())
                     .then(html => {
-                        // Create a temporary element to parse the HTML
                         const temp = document.createElement('div');
                         temp.innerHTML = html;
                         
-                        // Find the member number display in the response
                         const memberNoDisplay = temp.querySelector('.member-no-display');
                         if (memberNoDisplay) {
-                            // Replace the form with the updated version
                             const form = document.querySelector('form');
                             const oldMemberNo = document.querySelector('.member-no-display');
                             if (oldMemberNo) {
@@ -532,22 +503,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
-        // Ugandan phone number formatting
         document.querySelector('input[name="phone"]').addEventListener('input', function(e) {
             this.value = this.value.replace(/[^0-9]/g, '');
         });
         
-        // NIN validation (14 alphanumeric characters)
         document.querySelector('input[name="ninnumber"]').addEventListener('input', function(e) {
             this.value = this.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
         });
         
-        // Next of kin phone formatting
         document.querySelector('input[name="next_of_kin_contact"]').addEventListener('input', function(e) {
             this.value = this.value.replace(/[^0-9]/g, '');
         });
         
-        // Form validation feedback
         document.querySelector('form').addEventListener('submit', function(e) {
             if (!this.checkValidity()) {
                 e.preventDefault();
