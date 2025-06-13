@@ -1,37 +1,36 @@
 <?php
-session_start();
-
-// Verify the session file exists and is writable
-if (!file_exists(session_save_path()) || !is_writable(session_save_path())) {
-    die('Session directory not writable: ' . session_save_path());
-}
-
-// Standardize session check
-if (!isset($_SESSION['admin']['id'])) {
-    header("Location: /savingssystem/auth/login.php");
-    exit;
-}
-
-// Database connection
 require_once __DIR__ . '/config.php';
-require_once __DIR__ . '/includes/database.php';
-$pdo = $conn;
+require_once __DIR__ . '/helpers/auth.php'; // Include the new auth helpers
 
-// Debug session
-error_log("Index session data: " . print_r($_SESSION, true));
 
-// Check user role
-if ($_SESSION['admin']['role'] !== 'admin') {
-    $_SESSION['error'] = "Unauthorized access";
-    header('Location: /savingssystem/auth/login.php');
+if (!isset($_SESSION['user']['id'])) { // Check the new session structure
+    header("Location: " . BASE_URL . "landing.php");
     exit;
 }
-// Initialize stats array
+error_log("Index session data for user: " . print_r($_SESSION['user'] ?? 'No user session', true));
+
+// Check if the user has the required role(s) for this admin dashboard
+if (!has_role(['Core Admin', 'Administrator'])) {
+    // If logged in but not an admin/core_admin, redirect to landing or a member dashboard.
+    $_SESSION['error_message'] = "You do not have permission to access this dashboard."; // Use the new session key
+    // Potentially redirect to a member-specific dashboard if one exists and user is a member
+    if (has_role('Member') && isset($_SESSION['user']['member_id'])) {
+        header('Location: ' . BASE_URL . 'members/my_savings.php'); // Example member page
+    } else {
+        header('Location: ' . BASE_URL . 'landing.php'); // Default redirect for non-privileged users
+    }
+    exit;
+}
+
+// ==================== DASHBOARD STATISTICS ====================
 $stats = [];
 $transactions = [];
 
+
+if (!isset($monthly_savings)) $monthly_savings = ['labels'=>[], 'data'=>[]];
+if (!isset($top_members)) $top_members = ['labels'=>[], 'data'=>[]];
+
 try {
-    // ==================== DASHBOARD STATISTICS ====================
     // Total Members
     $stmt = $pdo->query("SELECT COUNT(*) as total FROM memberz");
     $stats['total_members'] = $stmt->fetchColumn();
@@ -44,15 +43,43 @@ try {
     $stmt = $pdo->query("SELECT COUNT(*) as total FROM loans WHERE status = 'approved'");
     $stats['active_loans'] = $stmt->fetchColumn();
 
-    // Recent Transactions (last 7 days)
+    // Recent Transactions (last 10)
     $stmt = $pdo->query("
-        SELECT t.id, m.full_name, t.amount, t.transaction_date, t.transaction_type 
-        FROM transactions t
-        JOIN memberz m ON t.member_id = m.member_no
-        ORDER BY t.transaction_date DESC 
-        LIMIT 10
+     SELECT s.member_id, m.full_name, s.amount, s.date
+    FROM savings s
+    JOIN memberz m ON s.member_id = m.id
+    ORDER BY s.date DESC
+    LIMIT 10
+");
+$transactions = $stmt->fetchAll();
+    // Top 5 Saving Members
+    $top_members = ['labels' => [], 'data' => []];
+    $stmt = $pdo->query("
+        SELECT m.full_name, SUM(s.amount) as total
+        FROM savings s
+        JOIN memberz m ON CAST(s.id AS CHAR) = CAST(m.id AS CHAR)
+        GROUP BY s.id
+        ORDER BY total DESC
+        LIMIT 5
     ");
-    $transactions = $stmt->fetchAll();
+    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        $top_members['labels'][] = $row['full_name'];
+        $top_members['data'][] = (float)$row['total'];
+    }
+
+    // Monthly Savings (last 6 months)
+    $monthly_savings = ['labels' => [], 'data' => []];
+    $stmt = $pdo->query("
+        SELECT DATE_FORMAT(date, '%b %Y') as month, SUM(amount) as total
+        FROM savings
+        WHERE date >= DATE_SUB(CURDATE(), INTERVAL 6 MONTH)
+        GROUP BY month
+        ORDER BY MIN(date) ASC
+    ");
+    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        $monthly_savings['labels'][] = $row['month'];
+        $monthly_savings['data'][] = (float)$row['total'];
+    }
 
 } catch (PDOException $e) {
     error_log("Database error: " . $e->getMessage());
@@ -117,64 +144,56 @@ try {
                 
                 <!-- Stats Cards -->
                <!-- Chat Section -->
-<div class="card mt-4">
-    <div class="card-header bg-white">
-        <h5 class="mb-0"><i class="fas fa-comments me-2"></i>Admin Chat</h5>
-    </div>
-    <div class="card-body" style="max-height: 300px; overflow-y: auto;" id="chat-messages">
-        <!-- Sample messages -->
-        <div class="mb-2"><strong>You:</strong> Welcome to the system!</div>
-        <div class="mb-2"><strong>System:</strong> Hello Admin! How can I assist you?</div>
-    </div>
-    <div class="card-footer bg-light">
-        <form id="chat-form" class="d-flex">
-            <input type="text" id="chat-input" class="form-control me-2" placeholder="Type a message..." required>
-            <button type="submit" class="btn btn-primary">Send</button>
-        </form>
-    </div>
-</div>
+
 
 
                 <!-- Chart Section -->
-                <div class="row mt-5">
-                    <div class="col-md-6 mb-4">
-                        <div class="card">
-                            <div class="card-header bg-white">
-                                <strong>Monthly Savings Trend</strong>
-                            </div>
-                            <div class="card-body">
-                                <canvas id="monthlySavingsChart"></canvas>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-6 mb-4">
-                        <div class="card">
-                            <div class="card-header bg-white">
-                                <strong>Top Saving Members</strong>
-                            </div>
-                            <div class="card-body">
-                                <canvas id="topMembersChart"></canvas>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </main>
+                <!-- ...inside your <main> ... -->
+<div class="row mt-5">
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header bg-white">
+                <strong>Monthly Savings Trend</strong>
+            </div>
+            <div class="card-body">
+                <canvas id="monthlySavingsChart"></canvas>
+            </div>
         </div>
     </div>
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header bg-white">
+                <strong>Top Saving Members</strong>
+            </div>
+            <div class="card-body">
+                <canvas id="topMembersChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+            </main>
 
     <!-- Bootstrap JS Bundle with Popper -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
     <!-- Chart Script -->
-    <script>
+<script>
+    // Pass PHP arrays to JS
+    const monthlySavingsData = <?= json_encode($monthly_savings) ?>;
+    const topMembersData = <?= json_encode($top_members) ?>;
+    // Debugging output for JS arrays
+    console.log("Monthly Savings Data:", monthlySavingsData);
+    console.log("Top Members Data:", topMembersData);
+
+        // Monthly Savings Bar Chart
         const monthlySavingsCtx = document.getElementById('monthlySavingsChart').getContext('2d');
-        const monthlySavingsChart = new Chart(monthlySavingsCtx, {
+        new Chart(monthlySavingsCtx, {
             type: 'bar',
             data: {
-                labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'], // Replace with dynamic data
+                labels: monthlySavingsData.labels || [],
                 datasets: [{
                     label: 'UGX Saved',
-                    data: [500000, 700000, 300000, 900000, 600000, 800000], // Replace with real data
+                    data: monthlySavingsData.data || [],
                     backgroundColor: '#1cc88a'
                 }]
             },
@@ -187,14 +206,15 @@ try {
             }
         });
 
+        // Top Members Pie Chart
         const topMembersCtx = document.getElementById('topMembersChart').getContext('2d');
-        const topMembersChart = new Chart(topMembersCtx, {
+        new Chart(topMembersCtx, {
             type: 'pie',
             data: {
-                labels: ['John', 'Mary', 'Alex', 'Jane', 'Paul'], // Replace with real member names
+                labels: topMembersData.labels || [],
                 datasets: [{
                     label: 'Total Savings',
-                    data: [1200000, 950000, 870000, 820000, 770000], // Replace with real totals
+                    data: topMembersData.data || [],
                     backgroundColor: [
                         '#4e73df',
                         '#1cc88a',

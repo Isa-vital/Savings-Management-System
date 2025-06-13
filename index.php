@@ -1,35 +1,12 @@
 <?php
-// Session is now started by config.php
-// session_start();
-
-// Verify the session file exists and is writable
-// This check might be problematic if session.save_path is not standard or accessible for direct check.
-// Consider removing if it causes issues or if server config ensures writability.
-// For now, commenting out as config.php handles session start, and this check might be too strict/problematic.
-/*
-if (!file_exists(session_save_path()) || !is_writable(session_save_path())) {
-die('Session directory not writable: ' . session_save_path());
-*/
-
-// Standardize session check
-// config.php should be included first to make BASE_URL available.
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/helpers/auth.php'; // Include the new auth helpers
 
-// Session path debugging block removed.
-
-// BASE_URL is now expected to be reliably defined in config.php, so local fallback is removed.
 
 if (!isset($_SESSION['user']['id'])) { // Check the new session structure
-    // Redirect to landing page if not logged in, as login page is for explicit login action.
-    // Or, redirect to login page if that's preferred flow. Landing page seems more user-friendly.
     header("Location: " . BASE_URL . "landing.php");
     exit;
 }
-
-// $pdo is already available from config.php, so no need for includes/database.php or $pdo=$conn;
-
-// Debug session - focus on the user part
 error_log("Index session data for user: " . print_r($_SESSION['user'] ?? 'No user session', true));
 
 // Check if the user has the required role(s) for this admin dashboard
