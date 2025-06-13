@@ -74,7 +74,7 @@ if (file_exists(__DIR__ . '/config.php')) {
                         <a class="nav-link" href="<?php echo rtrim($base_url, '/'); ?>/auth/login.php">Login</a>
                     </li>
                     <li class="nav-item">
-                        <a class="btn btn-primary" href="<?php echo rtrim($base_url, '/'); ?>/auth/register.php">Sign Up</a>
+                        <a class="btn btn-primary" href="<?php echo rtrim($base_url, '/'); ?>/auth/register.html">Sign Up</a>
                     </li>
                 </ul>
             </div>
@@ -86,7 +86,7 @@ if (file_exists(__DIR__ . '/config.php')) {
         <div class="container">
             <h1>Secure Your Future, Save With Us</h1>
             <p class="lead">Join thousands of members who are building a brighter financial future through disciplined savings and accessible credit with <?php echo htmlspecialchars($app_name); ?>.</p>
-            <a href="<?php echo rtrim($base_url, '/'); ?>/auth/register.php" class="btn btn-lg btn-success me-2">Sign Up Now</a>
+            <a href="<?php echo rtrim($base_url, '/'); ?>/auth/register.html" class="btn btn-lg btn-success me-2">Sign Up Now</a>
             <a href="<?php echo rtrim($base_url, '/'); ?>/auth/login.php" class="btn btn-lg btn-outline-light">Login</a>
         </div>
     </section>

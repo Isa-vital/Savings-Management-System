@@ -325,7 +325,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             </div>
         </div>
         <div class="login-footer">
-            <p>Don't have an account? <a href="<?php echo htmlspecialchars(BASE_URL . 'auth/register.php'); ?>">Sign Up</a></p>
+            <p>Don't have an account? <a href="<?php echo htmlspecialchars(BASE_URL . 'auth/register.html'); ?>">Sign Up</a></p>
             <p class="text-muted">&copy; <?php echo date("Y"); ?> <?php echo htmlspecialchars(defined('APP_NAME') ? APP_NAME : 'Savings App'); ?></p>
         </div>
     </div>

@@ -70,7 +70,7 @@ if (!defined('BASE_URL')) {
                     <span class="text-light">
                         <?php 
                         if (isset($_SESSION['user']['username'])) {
-                            echo htmlspecialchars($_SESSION['user']['username']);
+                            echo htmlspecialchars($_SESSION['user']['full_name'] ?? $_SESSION['user']['username']);
                         } else { 
                             echo "User"; // Fallback if username somehow not set
                         }

@@ -1,5 +1,5 @@
 <?php
-// Session is expected to be started by config.php,
+// Session is expected to be started by config.php, 
 // which should be included by the parent script before this sidebar partial.
 // if (session_status() === PHP_SESSION_NONE) { session_start(); }
 
@@ -19,7 +19,7 @@ if (!defined('BASE_URL')) {
     // A robust version should ideally be in config.php and correctly set for the environment.
     $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' || $_SERVER['SERVER_PORT'] == 443) ? "https://" : "http://";
     $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-    $script_name = $_SERVER['SCRIPT_NAME'] ?? '';
+    $script_name = $_SERVER['SCRIPT_NAME'] ?? ''; 
     $base_path_segment = '/'; // Default
     if (preg_match('/^(\/[^\/]+\/)/', $script_name, $matches)) {
          // If script_name starts with /somedir/ and is not in admin or auth, assume somedir is project root
@@ -44,12 +44,12 @@ if (!defined('BASE_URL')) {
 if (!function_exists('has_role') || !function_exists('is_logged_in')) {
     if(file_exists(__DIR__ . '/../helpers/auth.php')) {
         require_once __DIR__ . '/../helpers/auth.php';
-    } elseif (file_exists(__DIR__ . '/helpers/auth.php')) {
+    } elseif (file_exists(__DIR__ . '/helpers/auth.php')) { 
         require_once __DIR__ . '/helpers/auth.php';
     } else {
         // Define dummy functions if helpers are absolutely missing to prevent fatal errors in sidebar rendering
         if (!function_exists('is_logged_in')) { function is_logged_in_sidebar_fallback() { return isset($_SESSION['user']['id']); } }
-        if (!function_exists('has_role')) { function has_role($roles) {
+        if (!function_exists('has_role')) { function has_role($roles) { 
             if (!isset($_SESSION['user']['roles']) || !is_array($_SESSION['user']['roles'])) return false;
             if (is_string($roles)) $roles = [$roles];
             foreach($roles as $role) { if(in_array($role, $_SESSION['user']['roles'])) return true;}
@@ -74,7 +74,7 @@ $is_logged_in_user = function_exists('is_logged_in') ? is_logged_in() : (functio
                     </li>
                      <li class="nav-item">
                         <a class="nav-link" href="<?php echo htmlspecialchars(BASE_URL . 'overview.php'); ?>">
-                             <i class="fas fa-chart-pie me-2"></i> Stat Overview
+                             <i class="fas fa-chart-pie me-2"></i> Stat Overview 
                         </a>
                     </li>
                     <li class="nav-item">
@@ -93,15 +93,15 @@ $is_logged_in_user = function_exists('is_logged_in') ? is_logged_in() : (functio
                         </a>
                     </li>
                      <li class="nav-item">
-                        <a class="nav-link" href="<?php echo htmlspecialchars(BASE_URL . 'reports.php'); ?>">
-                            <i class="fas fa-chart-bar me-2"></i> Reports
+                        <a class="nav-link" href="<?php echo htmlspecialchars(BASE_URL . 'reports.php'); ?>"> 
+                            <i class="fas fa-chart-bar me-2"></i> Reports 
                         </a>
                     </li>
                     <!-- Removed transactions.php as it's not explicitly created -->
                 <?php endif; ?>
 
                 <?php // ADMINISTRATION DROPDOWN ?>
-                <?php
+                <?php 
                 $can_see_system_settings = has_role('Core Admin');
                 $can_see_user_management = has_role(['Core Admin', 'Administrator']);
                 $can_see_group_management = has_role('Core Admin');
@@ -144,7 +144,7 @@ $is_logged_in_user = function_exists('is_logged_in') ? is_logged_in() : (functio
                                         <i class="fas fa-layer-group me-2 text-secondary"></i> Group Management
                                     </a>
                                 </li>
-                                <li class="nav-item">
+                                <li class="nav-item"> 
                                     <a class="nav-link" href="<?= htmlspecialchars(BASE_URL . 'admin/group_management/assign_users.php') ?>">
                                         <i class="fas fa-user-tag me-2 text-secondary"></i> Assign User Roles
                                     </a>
@@ -158,14 +158,19 @@ $is_logged_in_user = function_exists('is_logged_in') ? is_logged_in() : (functio
 
                 <?php // MEMBER SPECIFIC ITEMS ?>
                 <?php if (has_role('Member') && isset($_SESSION['user']['member_id']) && !empty($_SESSION['user']['member_id'])): ?>
-                    <li class="nav-item mt-2">
+                    <li class="nav-item mt-2"> 
                         <h6 class="sidebar-heading d-flex justify-content-between align-items-center px-3 mt-4 mb-1 text-muted text-uppercase">
-                            <span>Member Area</span>
+                            <span>User Menu</span>
                         </h6>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="<?php echo htmlspecialchars(BASE_URL . 'members/my_savings.php'); ?>">
                             <i class="fas fa-wallet me-2"></i> My Savings
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="<?php echo htmlspecialchars(BASE_URL . 'members/request_deposit.php'); ?>">
+                            <i class="fas fa-donate me-2"></i> Request Deposit
                         </a>
                     </li>
                     <li class="nav-item">
@@ -185,7 +190,7 @@ $is_logged_in_user = function_exists('is_logged_in') ? is_logged_in() : (functio
                     </li>
                     <!-- Add other member-specific links here, e.g., apply for loan, loan history -->
                 <?php endif; ?>
-
+                
                 <?php // SHARED "MY PROFILE" FOR NON-MEMBER ADMINS ?>
                  <?php if (has_role(['Core Admin', 'Administrator']) && !(has_role('Member') && isset($_SESSION['user']['member_id']) && !empty($_SESSION['user']['member_id'])) ): ?>
                      <li class="nav-item mt-2"> <!-- Add some spacing if this is the only "personal" link for an admin -->
@@ -196,6 +201,11 @@ $is_logged_in_user = function_exists('is_logged_in') ? is_logged_in() : (functio
                      <li class="nav-item">
                         <a class="nav-link" href="<?php echo htmlspecialchars(BASE_URL . 'profile.php'); ?>">
                             <i class="fas fa-user-circle me-2"></i> My Profile
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="<?php echo htmlspecialchars(BASE_URL . 'auth/reset_password.php'); ?>">
+                            <i class="fas fa-key me-2"></i> Change Password
                         </a>
                     </li>
                  <?php endif; ?>
@@ -222,11 +232,16 @@ $is_logged_in_user = function_exists('is_logged_in') ? is_logged_in() : (functio
         </ul>
 
         <?php if ($is_logged_in_user): ?>
-        <hr>
+        <hr> 
         <ul class="nav flex-column mb-2">
              <li class="nav-item">
                 <a class="nav-link" href="<?php echo htmlspecialchars(BASE_URL . 'auth/logout.php'); ?>">
                     <i class="fas fa-sign-out-alt me-2"></i> Logout
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="<?php echo htmlspecialchars(BASE_URL . 'auth/reset_password.php'); ?>">
+                    <i class="fas fa-key me-2"></i> Change Password
                 </a>
             </li>
         </ul>

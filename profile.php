@@ -1,295 +1,345 @@
 <?php
-// Session is expected to be started by config.php
-// session_start();
-require_once __DIR__ . '/config.php'; // Ensures $pdo, BASE_URL, APP_NAME
-require_once __DIR__ . '/helpers/auth.php'; // For require_login, has_role
+// Start session if not already started
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
-require_login(); // Ensures any logged-in user can access their profile.
+// Load configuration and authentication helpers
+require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/helpers/auth.php';
 
-$user_id = $_SESSION['user']['id'];
+// Verify user is logged in
+require_login();
+
+// Initialize variables
+$user_id = $_SESSION['user']['id'] ?? null;
 $current_user_data = null;
-
-// Variables for SweetAlert
-$sa_profile_error = '';
-$sa_profile_success = '';
-
-// Capture session messages for SweetAlert and then unset them
-if (isset($_SESSION['error_message'])) {
-    $sa_profile_error = $_SESSION['error_message'];
-    unset($_SESSION['error_message']);
-}
-if (isset($_SESSION['success_message'])) {
-    $sa_profile_success = $_SESSION['success_message'];
-    unset($_SESSION['success_message']);
-}
-
-// $error_message is for inline display of POST validation errors from the current request
 $error_message = '';
-// $success_message is for inline display (though SweetAlert is primary now for success from session/redirect)
-$success_message = $sa_profile_success; // Initialize with session success for potential inline display
+$success_message = '';
 
+// Verify we have a valid user ID
+if (!$user_id) {
+    $_SESSION['error_message'] = "Invalid user session. Please log in again.";
+    header("Location: " . BASE_URL . "auth/login.php");
+    exit;
+}
 
-// Fetch user profile
+// Fetch user profile data with enhanced error handling
 try {
-    $stmt = $pdo->prepare("SELECT id, username, email, phone, photo, signature FROM users WHERE id = :user_id");
-    $stmt->execute(['user_id' => $user_id]);
+    $stmt = $pdo->prepare("
+        SELECT id, username, email, phone, photo, signature 
+        FROM users 
+        WHERE id = :user_id
+        LIMIT 1
+    ");
+    $stmt->execute([':user_id' => $user_id]);
     $current_user_data = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$current_user_data) {
-        // This should ideally not happen if user is logged in, but as a safeguard
-        $_SESSION['error_message'] = "Unable to load your profile data.";
-        header("Location: " . BASE_URL . "index.php"); // Redirect to a safe page
-        exit;
+        throw new Exception("User profile not found in database");
     }
+
 } catch (PDOException $e) {
-    error_log("Profile Fetch PDOException for user_id {$user_id}: " . $e->getMessage());
+    error_log("Database Error [Profile Fetch]: " . $e->getMessage());
     $error_message = "Could not load your profile due to a database error.";
-    // Allow page to render to show error
+} catch (Exception $e) {
+    error_log("Profile Error: " . $e->getMessage());
+    $error_message = $e->getMessage();
 }
 
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+// Handle form submission
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $current_user_data) {
+    // Validate CSRF token
     if (!isset($_POST['csrf_token']) || !validateToken($_POST['csrf_token'])) {
-        $error_message = 'CSRF token validation failed. Please try again.';
-    } elseif ($current_user_data) { // Proceed only if user data was loaded
+        $error_message = 'Security token validation failed.';
+    } else {
+        // Process form data
         $email = filter_var(trim($_POST['email'] ?? ''), FILTER_VALIDATE_EMAIL);
-        $phone = trim($_POST['phone'] ?? ''); // Add phone update
+        $phone = preg_replace('/[^0-9]/', '', $_POST['phone'] ?? '');
+        $username = trim($_POST['username'] ?? $current_user_data['username']);
 
-        // Initialize with existing images, update if new ones are uploaded
-        $photo = $current_user_data['photo'];
-        $signature = $current_user_data['signature'];
-        $update_fields = ['email' => $email, 'phone' => $phone]; // Start with fields always updated
+        // Initialize with existing values
+        $update_data = [
+            'username' => $username ?: $current_user_data['username'],
+            'email' => $email ?: $current_user_data['email'],
+            'phone' => $phone ?: $current_user_data['phone'],
+            'photo' => $current_user_data['photo'],
+            'signature' => $current_user_data['signature']
+        ];
 
-        if (empty($email)) {
-            $error_message = "Email address cannot be empty.";
-        } else {
-            // Handle profile photo upload
-            if (isset($_FILES['photo']) && $_FILES['photo']['error'] == UPLOAD_ERR_OK && !empty($_FILES['photo']['name'])) {
-                $photo_dir = __DIR__ . "/assets/uploads/";
-                if (!is_dir($photo_dir)) mkdir($photo_dir, 0755, true);
-                $photo_ext = strtolower(pathinfo($_FILES['photo']['name'], PATHINFO_EXTENSION));
-                $allowed_exts = ['jpg', 'jpeg', 'png', 'gif'];
-                if (in_array($photo_ext, $allowed_exts) && $_FILES['photo']['size'] < 2000000) { // Max 2MB
-                    $photoName = "user_" . $user_id . "_photo_" . uniqid() . "." . $photo_ext;
-                    if (move_uploaded_file($_FILES['photo']['tmp_name'], $photo_dir . $photoName)) {
-                        // Optionally delete old photo if it exists and is different
-                        if ($photo && $photo !== $photoName && file_exists($photo_dir . $photo)) {
-                            @unlink($photo_dir . $photo);
-                        }
-                        $photo = $photoName;
-                        $update_fields['photo'] = $photo;
-                    } else {
-                        $error_message = ($error_message ? $error_message."<br>" : "") . "Failed to upload profile photo.";
-                    }
+        // Validate email
+        if (!$email && empty($current_user_data['email'])) {
+            $error_message = "A valid email address is required.";
+        }
+
+        // Validate username
+        if (empty($username)) {
+            $error_message = "Username is required.";
+        } elseif (!preg_match('/^[a-zA-Z0-9_]{3,}$/', $username)) {
+            $error_message = "Username must be at least 3 characters and contain only letters, numbers, or underscores.";
+        }
+
+        // Handle file uploads if no errors yet
+        if (empty($error_message)) {
+            $upload_dir = __DIR__ . '/assets/uploads/';
+            
+            // Process profile photo
+            if (!empty($_FILES['photo']['name'])) {
+                $photo_result = handleFileUpload('photo', $upload_dir, [
+                    'max_size' => 2 * 1024 * 1024, // 2MB
+                    'user_id' => $user_id,
+                    'current_file' => $current_user_data['photo']
+                ]);
+                
+                if ($photo_result['success']) {
+                    $update_data['photo'] = $photo_result['filename'];
                 } else {
-                     $error_message = ($error_message ? $error_message."<br>" : "") . "Invalid photo file type or size (max 2MB, jpg/png/gif).";
+                    $error_message = $photo_result['error'];
                 }
             }
 
-            // Handle signature upload
-            if (isset($_FILES['signature']) && $_FILES['signature']['error'] == UPLOAD_ERR_OK && !empty($_FILES['signature']['name'])) {
-                $sig_dir = __DIR__ . "/assets/uploads/";
-                if (!is_dir($sig_dir)) mkdir($sig_dir, 0755, true);
-                $sig_ext = strtolower(pathinfo($_FILES['signature']['name'], PATHINFO_EXTENSION));
-                 if (in_array($sig_ext, $allowed_exts) && $_FILES['signature']['size'] < 1000000) { // Max 1MB
-                    $sigName = "user_" . $user_id . "_sig_" . uniqid() . "." . $sig_ext;
-                    if (move_uploaded_file($_FILES['signature']['tmp_name'], $sig_dir . $sigName)) {
-                         if ($signature && $signature !== $sigName && file_exists($sig_dir . $signature)) {
-                            @unlink($sig_dir . $signature);
-                        }
-                        $signature = $sigName;
-                        $update_fields['signature'] = $signature;
-                    } else {
-                        $error_message = ($error_message ? $error_message."<br>" : "") . "Failed to upload signature image.";
-                    }
+            // Process signature if no errors yet
+            if (empty($error_message) && !empty($_FILES['signature']['name'])) {
+                $signature_result = handleFileUpload('signature', $upload_dir, [
+                    'max_size' => 1 * 1024 * 1024, // 1MB
+                    'user_id' => $user_id,
+                    'current_file' => $current_user_data['signature']
+                ]);
+                
+                if ($signature_result['success']) {
+                    $update_data['signature'] = $signature_result['filename'];
                 } else {
-                    $error_message = ($error_message ? $error_message."<br>" : "") . "Invalid signature file type or size (max 1MB, jpg/png/gif).";
-                }
-            }
-
-            if (empty($error_message)) { // Proceed if no upload errors and email is valid
-                try {
-                    // Check if email needs to be updated and if it's unique (if changed)
-                    if ($email !== $current_user_data['email']) {
-                        $stmt_check_email = $pdo->prepare("SELECT id FROM users WHERE email = :email AND id != :user_id");
-                        $stmt_check_email->execute(['email' => $email, 'user_id' => $user_id]);
-                        if ($stmt_check_email->fetch()) {
-                            $error_message = "That email address is already in use by another account.";
-                        }
-                    }
-
-                    if (empty($error_message)) {
-                         $sql_parts = [];
-                         foreach (array_keys($update_fields) as $field) {
-                             $sql_parts[] = "`{$field}` = :{$field}";
-                         }
-                         $sql_update = "UPDATE users SET " . implode(', ', $sql_parts) . ", updated_at = NOW() WHERE id = :user_id";
-
-                        $updateStmt = $pdo->prepare($sql_update);
-                        $update_params = array_merge($update_fields, ['user_id' => $user_id]);
-                        $updateStmt->execute($update_params);
-
-                        $_SESSION['success_message'] = "Profile updated successfully.";
-                        header("Location: profile.php"); // Redirect to refresh and show success
-                        exit;
-                    }
-                } catch (PDOException $e) {
-                     error_log("Profile Update PDOException for user_id {$user_id}: " . $e->getMessage());
-                     $error_message = "Database error updating profile. Please try again.";
+                    $error_message = $signature_result['error'];
                 }
             }
         }
+
+        // If still no errors, update database
+        if (empty($error_message)) {
+            try {
+                // Check if email or username is being changed and is unique
+                if (
+                    $update_data['email'] !== $current_user_data['email'] ||
+                    $update_data['username'] !== $current_user_data['username']
+                ) {
+                    $stmt = $pdo->prepare("
+                        SELECT id FROM users 
+                        WHERE (email = :email OR username = :username) AND id != :user_id 
+                        LIMIT 1
+                    ");
+                    $stmt->execute([
+                        ':email' => $update_data['email'],
+                        ':username' => $update_data['username'],
+                        ':user_id' => $user_id
+                    ]);
+                    
+                    if ($stmt->fetch()) {
+                        throw new Exception("That email address or username is already in use.");
+                    }
+                }
+
+                // Build dynamic update query
+                $set_parts = [];
+                foreach ($update_data as $field => $value) {
+                    $set_parts[] = "$field = :$field";
+                }
+                
+                $sql = "
+                    UPDATE users 
+                    SET " . implode(', ', $set_parts) . " 
+                    WHERE id = :user_id
+                ";
+                
+                $stmt = $pdo->prepare($sql);
+                $update_data['user_id'] = $user_id;
+                $stmt->execute($update_data);
+
+                $_SESSION['success_message'] = "Profile updated successfully!";
+                header("Location: profile.php");
+                exit;
+                
+            } catch (PDOException $e) {
+                error_log("Database Error [Profile Update]: " . $e->getMessage());
+                $error_message = "Failed to update profile. Please try again.";
+            } catch (Exception $e) {
+                $error_message = $e->getMessage();
+            }
+        }
+    }
+}
+
+// File upload handler function
+function handleFileUpload($field, $upload_dir, $options) {
+    $result = ['success' => false];
+    
+    if (!is_dir($upload_dir)) {
+        mkdir($upload_dir, 0755, true);
+    }
+
+    $file = $_FILES[$field];
+    $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+    $allowed_types = ['jpg', 'jpeg', 'png', 'gif'];
+    
+    // Validate file
+    if (!in_array($ext, $allowed_types)) {
+        $result['error'] = "Invalid file type. Only JPG, PNG, GIF allowed.";
+    } elseif ($file['size'] > $options['max_size']) {
+        $result['error'] = "File too large. Max " . ($options['max_size'] / 1024 / 1024) . "MB allowed.";
+    } elseif ($file['error'] !== UPLOAD_ERR_OK) {
+        $result['error'] = "File upload error: " . $file['error'];
     } else {
-        $error_message = "Could not load user data to process update.";
+        // Generate unique filename
+        $filename = "user_{$options['user_id']}_{$field}_" . uniqid() . ".$ext";
+        $target_path = $upload_dir . $filename;
+        
+        if (move_uploaded_file($file['tmp_name'], $target_path)) {
+            // Delete old file if it exists
+            if (!empty($options['current_file']) && file_exists($upload_dir . $options['current_file'])) {
+                @unlink($upload_dir . $options['current_file']);
+            }
+            
+            $result['success'] = true;
+            $result['filename'] = $filename;
+        } else {
+            $result['error'] = "Failed to save uploaded file.";
+        }
     }
+    
+    return $result;
 }
-
-// Re-fetch data if updated, or use existing if not POST/failed POST
-if (isset($_SESSION['success_message'])) { // After redirect
-    $success_message = $_SESSION['success_message'];
-    unset($_SESSION['success_message']);
-    // Re-fetch user data to show updated info
-    try {
-        $stmt = $pdo->prepare("SELECT id, username, email, phone, photo, signature FROM users WHERE id = :user_id");
-        $stmt->execute(['user_id' => $user_id]);
-        $current_user_data = $stmt->fetch(PDO::FETCH_ASSOC);
-    } catch (PDOException $e) {
-        error_log("Profile Re-Fetch PDOException for user_id {$user_id}: " . $e->getMessage());
-        $error_message = "Could not reload profile data after update.";
-    }
-}
-if(isset($_SESSION['error_message']) && empty($error_message)){ // From redirect
-    $error_message = $_SESSION['error_message'];
-    unset($_SESSION['error_message']);
-}
-
-
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Profile - <?php echo htmlspecialchars(APP_NAME); ?></title>
+    <title>My Profile - <?= htmlspecialchars(APP_NAME) ?></title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        /* Basic styling, can be expanded or moved to a CSS file */
-        .profile-img-preview { max-height: 150px; margin-bottom: 10px; }
-        .img-thumbnail { padding: 0.25rem; background-color: #fff; border: 1px solid #dee2e6; border-radius: 0.25rem; max-width: 100%; height: auto;}
+        .profile-img {
+            max-width: 200px;
+            max-height: 200px;
+            border-radius: 4px;
+        }
+        .img-preview-container {
+            margin-bottom: 1rem;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
-<?php include __DIR__ . '/partials/navbar.php'; ?>
-<div class="container-fluid">
-    <div class="row">
-        <?php include __DIR__ . '/partials/sidebar.php'; ?>
-
-        <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
-            <h2 class="mb-4"><i class="fas fa-user-circle me-2"></i>My Profile</h2>
-
-            <?php /* Inline success message for $_SESSION['success_message'] (now $success_message var)
-                     and $_GET['updated'] will be handled by SweetAlert.
-                     Only keeping inline $error_message for immediate POST validation feedback. */ ?>
-            <?php if (!empty($error_message) && empty($sa_profile_error) ): // Only show if it's a POST error not yet set for SA ?>
-                <div class="alert alert-danger"><?php echo htmlspecialchars($error_message); ?></div>
-            <?php endif; ?>
-
-            <?php if ($current_user_data): ?>
-            <div class="card shadow-sm">
-                <div class="card-header">
-                    <h5 class="mb-0">Update Your Details</h5>
+    <?php include __DIR__ . '/partials/navbar.php'; ?>
+    
+    <div class="container-fluid">
+        <div class="row">
+            <?php include __DIR__ . '/partials/sidebar.php'; ?>
+            
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
+                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                    <h1 class="h2"><i class="fas fa-user-circle me-2"></i>My Profile</h1>
                 </div>
-                <div class="card-body">
-                    <form method="POST" action="profile.php" enctype="multipart/form-data">
-                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(generateToken()); ?>">
-                        <div class="row">
-                            <div class="col-md-8">
-                                <div class="mb-3">
-                                    <label for="username" class="form-label">Username</label>
-                                    <input type="text" id="username" class="form-control" value="<?php echo htmlspecialchars($current_user_data['username']); ?>" disabled readonly>
-                                    <small class="form-text text-muted">Username cannot be changed.</small>
+
+                <?php if (isset($_SESSION['error_message'])): ?>
+                    <div class="alert alert-danger"><?= htmlspecialchars($_SESSION['error_message']) ?></div>
+                    <?php unset($_SESSION['error_message']); ?>
+                <?php endif; ?>
+                
+                <?php if (isset($_SESSION['success_message'])): ?>
+                    <div class="alert alert-success"><?= htmlspecialchars($_SESSION['success_message']) ?></div>
+                    <?php unset($_SESSION['success_message']); ?>
+                <?php endif; ?>
+                
+                <?php if ($error_message): ?>
+                    <div class="alert alert-danger"><?= htmlspecialchars($error_message) ?></div>
+                <?php endif; ?>
+
+                <?php if ($current_user_data): ?>
+                <div class="card shadow-sm mb-4">
+                    <div class="card-body">
+                        <form method="POST" enctype="multipart/form-data">
+                            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(generateToken()) ?>">
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label">Username</label>
+                                        <input type="text" class="form-control" value="<?= htmlspecialchars($current_user_data['username']) ?>" readonly>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label for="email" class="form-label">Email Address *</label>
+                                        <input type="email" id="email" name="email" class="form-control" 
+                                               value="<?= htmlspecialchars($_POST['email'] ?? $current_user_data['email']) ?>" required>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label for="phone" class="form-label">Phone Number</label>
+                                        <input type="tel" id="phone" name="phone" class="form-control" 
+                                               value="<?= htmlspecialchars($_POST['phone'] ?? $current_user_data['phone']) ?>">
+                                    </div>
                                 </div>
-                                <div class="mb-3">
-                                    <label for="email" class="form-label">Email address</label>
-                                    <input type="email" id="email" name="email" class="form-control" value="<?php echo htmlspecialchars($_POST['email'] ?? $current_user_data['email']); ?>" required>
-                                </div>
-                                <div class="mb-3">
-                                    <label for="phone" class="form-label">Phone Number</label>
-                                    <input type="tel" id="phone" name="phone" class="form-control" value="<?php echo htmlspecialchars($_POST['phone'] ?? ($current_user_data['phone'] ?? '')); ?>">
+                                
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label">Profile Photo</label>
+                                        <div class="img-preview-container">
+                                            <?php if (!empty($current_user_data['photo'])): ?>
+                                                <img src="<?= BASE_URL ?>assets/uploads/<?= htmlspecialchars($current_user_data['photo']) ?>" 
+                                                     alt="Profile Photo" class="profile-img img-thumbnail">
+                                            <?php else: ?>
+                                                <img src="https://via.placeholder.com/200" alt="No Photo" class="profile-img img-thumbnail">
+                                            <?php endif; ?>
+                                        </div>
+                                        <input type="file" name="photo" class="form-control" accept="image/*">
+                                        <small class="text-muted">Max 2MB (JPG, PNG, GIF)</small>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label class="form-label">Signature</label>
+                                        <div class="img-preview-container">
+                                            <?php if (!empty($current_user_data['signature'])): ?>
+                                                <img src="<?= BASE_URL ?>assets/uploads/<?= htmlspecialchars($current_user_data['signature']) ?>" 
+                                                     alt="Signature" class="profile-img img-thumbnail">
+                                            <?php else: ?>
+                                                <img src="https://via.placeholder.com/200x100" alt="No Signature" class="profile-img img-thumbnail">
+                                            <?php endif; ?>
+                                        </div>
+                                        <input type="file" name="signature" class="form-control" accept="image/*">
+                                        <small class="text-muted">Max 1MB (JPG, PNG, GIF)</small>
+                                    </div>
                                 </div>
                             </div>
-                            <div class="col-md-4 text-center">
-                                <div class="mb-3">
-                                    <label for="photo" class="form-label">Profile Photo</label><br>
-                                    <?php if (!empty($current_user_data['photo'])): ?>
-                                        <img src="<?php echo BASE_URL . 'assets/uploads/' . htmlspecialchars($current_user_data['photo']); ?>" alt="Current Profile Photo" class="img-thumbnail profile-img-preview">
-                                    <?php else: ?>
-                                        <img src="https://via.placeholder.com/150?text=No+Photo" alt="No Profile Photo" class="img-thumbnail profile-img-preview">
-                                    <?php endif; ?>
-                                    <input type="file" name="photo" id="photo" class="form-control form-control-sm mt-2">
-                                    <small class="form-text text-muted">Max 2MB (JPG, PNG, GIF)</small>
-                                </div>
-                                <div class="mb-3">
-                                    <label for="signature" class="form-label">Signature Image</label><br>
-                                    <?php if (!empty($current_user_data['signature'])): ?>
-                                        <img src="<?php echo BASE_URL . 'assets/uploads/' . htmlspecialchars($current_user_data['signature']); ?>" alt="Current Signature" class="img-thumbnail profile-img-preview">
-                                    <?php else: ?>
-                                         <img src="https://via.placeholder.com/150x75?text=No+Signature" alt="No Signature" class="img-thumbnail profile-img-preview">
-                                    <?php endif; ?>
-                                    <input type="file" name="signature" id="signature" class="form-control form-control-sm mt-2">
-                                    <small class="form-text text-muted">Max 1MB (JPG, PNG, GIF)</small>
-                                </div>
+                            
+                            <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-save me-1"></i> Save Changes
+                                </button>
                             </div>
-                        </div>
-                        <hr>
-                        <button type="submit" class="btn btn-primary"><i class="fas fa-save me-2"></i>Update Profile</button>
-                    </form>
+                        </form>
+                    </div>
                 </div>
-            </div>
-            <?php else: ?>
-                <p>Could not load profile information.</p>
-            <?php endif; ?>
-        </main>
+                <?php endif; ?>
+            </main>
+        </div>
     </div>
-    <?php require_once 'partials/footer.php'; ?>
-</div>
-<<<<<<< HEAD
 
-   
-=======
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        <?php
-        // Consolidate GET 'updated' flag into $sa_profile_success if no other session success message exists
-        if (isset($_GET['updated']) && $_GET['updated'] == '1' && empty($sa_profile_success)) {
-             $sa_profile_success = 'Profile updated successfully.';
-        }
-        // If $error_message was set from POST validation (and not from session), ensure it's set for SweetAlert
-        if (!empty($error_message) && empty($sa_profile_error)) {
-            $sa_profile_error = $error_message;
-        }
-        ?>
-        <?php if (!empty($sa_profile_error)): ?>
-            Swal.fire({
-                icon: 'error',
-                title: 'Update Error',
-                html: '<?php echo addslashes(htmlspecialchars($sa_profile_error)); ?>', // Use html to render <br> if present
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Preview image before upload
+        document.querySelectorAll('input[type="file"]').forEach(input => {
+            input.addEventListener('change', function(e) {
+                const preview = this.closest('.mb-3').querySelector('img');
+                if (this.files && this.files[0]) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        preview.src = e.target.result;
+                    }
+                    reader.readAsDataURL(this.files[0]);
+                }
             });
-        <?php endif; ?>
-        <?php if (!empty($sa_profile_success)): ?>
-            Swal.fire({
-                icon: 'success',
-                title: 'Success!',
-                text: '<?php echo addslashes(htmlspecialchars($sa_profile_success)); ?>',
-            });
-            // Clean the URL if updated=1 was present
-            if (window.location.search.includes('updated=1')) {
-                history.replaceState(null, '', window.location.pathname);
-            }
-        <?php endif; ?>
-    });
-</script>
->>>>>>> fae297eec5a53500d5bda68acce40832ef0b4522
+        });
+    </script>
+</body>
+</html>
