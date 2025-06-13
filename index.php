@@ -145,8 +145,8 @@ try {
                                 </div>
                             </div>
                             <div class="card-footer bg-light">
-                                <a href="/savingssystem/savings/transactions.php" class="text-decoration-none">
-                                    View transactions <i class="fas fa-arrow-right ms-1"></i>
+                                <a href="/savingssystem/savings/savingslist.php" class="text-decoration-none">
+                                    View Savings Details <i class="fas fa-arrow-right ms-1"></i>
                                 </a>
                             </div>
                         </div>
@@ -174,51 +174,7 @@ try {
                     </div>
                 </div>
                 
-                <!-- Recent Transactions -->
-                <div class="card mb-4">
-                    <div class="card-header bg-white">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <h5 class="mb-0">
-                                <i class="fas fa-exchange-alt me-2"></i>Recent Transactions
-                            </h5>
-                            <a href="savings/transactions.php" class="btn btn-sm btn-outline-primary">
-                                View All
-                            </a>
-                        </div>
-                    </div>
-                    <div class="card-body recent-transactions">
-                        <div class="table-responsive">
-                            <table class="table table-hover">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th>#</th>
-                                        <th>Member</th>
-                                        <th>Amount</th>
-                                        <th>Type</th>
-                                        <th>Date</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php foreach ($transactions as $transaction): ?>
-                                    <tr>
-                                        <td><?= htmlspecialchars($transaction['id']) ?></td>
-                                        <td><?= htmlspecialchars($transaction['full_name']) ?></td>
-                                        <td class="<?= $transaction['transaction_type'] === 'deposit' ? 'text-success' : 'text-danger' ?>">
-                                            UGX <?= number_format($transaction['amount'], 2) ?>
-                                        </td>
-                                        <td>
-                                            <span class="badge bg-<?= $transaction['transaction_type'] === 'deposit' ? 'success' : 'warning' ?>">
-                                                <?= ucfirst(htmlspecialchars($transaction['transaction_type'])) ?>
-                                            </span>
-                                        </td>
-                                        <td><?= date('M j, Y g:i a', strtotime($transaction['transaction_date'])) ?></td>
-                                    </tr>
-                                    <?php endforeach; ?>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
+               
                 
                 <!-- Quick Actions -->
                 <div class="row">

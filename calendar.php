@@ -1,106 +1,211 @@
 <?php
 session_start();
 
-// Session validation
-if (!isset($_SESSION['admin']['id'])) {
+// Redirect if not logged in
+if (!isset($_SESSION['user']['id'])) {
     header("Location: /savingssystem/auth/login.php");
     exit;
 }
 
-// Database connection
+// Load dependencies
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/includes/database.php';
+require_once __DIR__ . '/vendor/autoload.php';
+require_once __DIR__ . '/emails/email_template.php';
 
-// Initialize variables
-$year = date('Y');
-$withdrawalDate = new DateTime("$year-12-15");
-$meetingDay = 'Tuesday';
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\SMTP;
+use PHPMailer\PHPMailer\Exception;
 
-// Fetch all active members
-try {
-    $stmt = $pdo->query("
-        SELECT 
-            m.member_no,
-            m.full_name,
-            MIN(s.transaction_date) as start_date
-        FROM memberz m
-        LEFT JOIN savings s ON m.member_no = s.member_id
-        WHERE m.is_active = 1
-        GROUP BY m.member_no, m.full_name
-    ");
-    $members = $stmt->fetchAll(PDO::FETCH_ASSOC);
-} catch (PDOException $e) {
-    error_log("Database error: " . $e->getMessage());
-    $_SESSION['error'] = "Failed to load member data";
-    $members = [];
+// Configuration
+$currentYear = date('Y');
+$withdrawalDate = new DateTime("$currentYear-12-15");
+$meetingDay = 'Tuesday'; // Weekly meeting day
+$adminEmail = 'info.rksavingssystem@gmail.com';
+
+// Process form submissions
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (isset($_POST['send_reminder'])) {
+        handleReminderRequest($pdo, $adminEmail);
+    } elseif (isset($_POST['attendance'])) {
+        handleAttendanceSubmission($pdo);
+    }
+    header("Location: " . $_SERVER['PHP_SELF']);
+    exit;
 }
 
 // Generate all meeting dates for the year
-$startDate = date('Y-01-01');
-$endDate = $withdrawalDate->format('Y-m-d');
-$meetingDates = [];
+$meetingDates = generateMeetingDates($currentYear, $meetingDay, $withdrawalDate);
 
-$current = new DateTime($startDate);
-if ($current->format('l') !== $meetingDay) {
-    $current->modify("next $meetingDay");
-}
+// Get all active members
+$members = fetchActiveMembers($pdo);
 
-while ($current <= new DateTime($endDate)) {
-    $meetingDates[] = [
-        'date' => $current->format('Y-m-d'),
-        'day' => $current->format('l'),
-        'type' => 'meeting',
-        'members_present' => []
-    ];
-    $current->modify("+1 week");
-}
+// Assign all members to all meetings
+assignMembersToMeetings($meetingDates, $members);
 
-// Add withdrawal date
-$meetingDates[] = [
-    'date' => $withdrawalDate->format('Y-m-d'),
-    'day' => $withdrawalDate->format('l'),
-    'type' => 'withdrawal',
-    'members_present' => []
-];
-
-// Assign members to dates
-foreach ($members as $member) {
-    $memberStartDate = $member['start_date'] ?: date('Y-m-d');
-    foreach ($meetingDates as &$meeting) {
-        if ($meeting['date'] >= $memberStartDate) {
-            $meeting['members_present'][] = [
-                'id' => $member['member_no'],
-                'name' => $member['full_name'],
-                'attended' => false // Default attendance status
-            ];
+// Handle reminder email sending
+function handleReminderRequest($pdo, $fromEmail) {
+    try {
+        $eventDate = $_POST['event_date'];
+        $eventType = $_POST['event_type'];
+        
+        $members = fetchActiveMembers($pdo);
+        
+        if (empty($members)) {
+            throw new Exception("No active members found to notify");
         }
+        
+        $mail = new PHPMailer(true);
+        configureMailer($mail, $fromEmail);
+        
+        $successCount = 0;
+        foreach ($members as $member) {
+            if (!empty($member['email'])) {
+                try {
+                    sendReminderEmail($mail, $member, $eventDate, $eventType);
+                    $successCount++;
+                } catch (Exception $e) {
+                    error_log("Email failed for {$member['email']}: " . $e->getMessage());
+                }
+            }
+        }
+        
+        $_SESSION['success'] = "Reminders sent to {$successCount} members";
+    } catch (Exception $e) {
+        $_SESSION['error'] = "Reminder error: " . $e->getMessage();
     }
 }
-unset($meeting);
 
-// Process attendance form submission
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['attendance'])) {
+// Configure PHPMailer settings
+function configureMailer($mail, $fromEmail) {
+    $mail->isSMTP();
+    $mail->Host = 'smtp.gmail.com';
+    $mail->SMTPAuth = true;
+    $mail->Username = $fromEmail;
+    $mail->Password = 'your_app_specific_password'; // Use app password
+    $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+    $mail->Port = 587;
+    $mail->setFrom($fromEmail, 'RK Savings System');
+    $mail->isHTML(true);
+}
+
+// Send individual reminder email
+function sendReminderEmail($mail, $member, $eventDate, $eventType) {
+    $mail->clearAddresses();
+    $mail->addAddress($member['email'], $member['full_name']);
+    
+    $formattedDate = date('l, F j, Y', strtotime($eventDate));
+    $emailContent = generateEmailContent($member, $eventType, $formattedDate);
+    
+    $mail->Subject = 'Reminder: ' . ($eventType === 'withdrawal' ? 'Annual Withdrawal' : 'Weekly Savings Meeting');
+    $mail->Body = generateBasicEmailTemplate($emailContent, APP_NAME);
+    $mail->AltBody = stripEmailContent($emailContent);
+    
+    $mail->send();
+}
+
+// Generate email content
+function generateEmailContent($member, $eventType, $formattedDate) {
+    return "
+        <h2>Savings System Reminder</h2>
+        <p>Hello {$member['full_name']},</p>
+        <p>This is a friendly reminder about our upcoming event:</p>
+        <p><strong>" . ($eventType === 'withdrawal' ? 'Annual Withdrawal Day' : 'Weekly Savings Meeting') . "</strong><br>
+        Date: {$formattedDate}</p>
+        <p>Please make sure to attend and bring your savings book.</p>
+        <p>Thank you,<br>RK Savings System</p>
+    ";
+}
+
+// Strip HTML tags for plain text version
+function stripEmailContent($content) {
+    return strip_tags(str_replace(["<p>", "</p>", "<br>"], ["", "\n", "\n"], $content));
+}
+
+// Handle attendance form submission
+function handleAttendanceSubmission($pdo) {
     try {
         $pdo->beginTransaction();
         
-        foreach ($_POST['attendance'] as $date => $memberIds) {
-            // Here you would save to database
-            // Example: UPDATE attendance_records SET attended=1 WHERE date=? AND member_id IN(...)
-        }
+        // Process attendance data
+        // Implementation depends on your database structure
+        // Example: Save to attendance_records table
         
         $pdo->commit();
         $_SESSION['success'] = "Attendance saved successfully!";
     } catch (Exception $e) {
         $pdo->rollBack();
-        $_SESSION['error'] = "Failed to save attendance: " . $e->getMessage();
+        $_SESSION['error'] = "Attendance error: " . $e->getMessage();
     }
 }
-?>
-<?php
-// [Keep all your existing PHP logic for sessions/database]
-// [Keep the $meetingDates generation code from previous example]
-?>
 
+// Generate all meeting dates for the year
+function generateMeetingDates($year, $meetingDay, $withdrawalDate) {
+    $startDate = date("$year-01-01");
+    $endDate = $withdrawalDate->format('Y-m-d');
+    $dates = [];
+    
+    $current = new DateTime($startDate);
+    if ($current->format('l') !== $meetingDay) {
+        $current->modify("next $meetingDay");
+    }
+
+    while ($current <= new DateTime($endDate)) {
+        $dates[] = [
+            'date' => $current->format('Y-m-d'),
+            'day' => $current->format('l'),
+            'type' => 'meeting',
+            'members_present' => []
+        ];
+        $current->modify("+1 week");
+    }
+
+    // Add withdrawal date
+    $dates[] = [
+        'date' => $withdrawalDate->format('Y-m-d'),
+        'day' => $withdrawalDate->format('l'),
+        'type' => 'withdrawal',
+        'members_present' => []
+    ];
+
+    return $dates;
+}
+
+// Fetch all active members
+function fetchActiveMembers($pdo) {
+    try {
+        $stmt = $pdo->query("
+            SELECT member_no, full_name, email
+            FROM memberz
+            ORDER BY full_name
+        ");
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        error_log("Database error: " . $e->getMessage());
+        $_SESSION['error'] = "Failed to load member data";
+        return [];
+    }
+}
+
+// Assign all members to all meetings
+function assignMembersToMeetings(&$meetingDates, $members) {
+    foreach ($meetingDates as &$meeting) {
+        $meeting['members_present'] = array_map(function($member) {
+            return [
+                'id' => $member['member_no'],
+                'name' => $member['full_name'],
+                'attended' => false
+            ];
+        }, $members);
+    }
+    unset($meeting);
+}
+
+// Notification variables for SweetAlert
+$page_error = $_SESSION['error'] ?? '';
+$page_success = $_SESSION['success'] ?? '';
+unset($_SESSION['error'], $_SESSION['success']);
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -109,6 +214,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['attendance'])) {
     <title><?= htmlspecialchars(APP_NAME) ?> - Savings Calendar</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
     <style>
         :root {
             --meeting-color: #4e73df;
@@ -219,7 +325,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['attendance'])) {
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-4 border-bottom">
                     <h1 class="h2">
                         <i class="fas fa-calendar-alt me-2"></i>Savings Calendar
-                        <small class="text-muted"><?= $year ?></small>
+                        <small class="text-muted"><?= $currentYear ?></small>
                     </h1>
                     <div class="btn-toolbar mb-2 mb-md-0">
                         <div class="btn-group">
@@ -241,9 +347,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['attendance'])) {
                         <div class="flex-grow-1 ms-3">
                             <h5 class="alert-heading">Meeting Schedule</h5>
                             <p class="mb-0">
-                                Weekly deposits every <strong><?= $meetingDay ?></strong>. 
-                                All savings will be withdrawn on 
-                                <strong><?= $withdrawalDate->format('F j, Y') ?></strong>.
+                                Weekly savings every <strong><?= $meetingDay ?></strong>. 
+                                Annual withdrawal on <strong><?= $withdrawalDate->format('F j, Y') ?></strong>.
+                                All active members participate in all meetings.
                             </p>
                         </div>
                     </div>
@@ -281,7 +387,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['attendance'])) {
                                                         type="checkbox" 
                                                         name="attendance[<?= $event['date'] ?>][]" 
                                                         value="<?= $member['id'] ?>"
-                                                        <?= /* Add checked status if previously saved */ false ? 'checked' : '' ?>
+                                                        <?= $member['attended'] ? 'checked' : '' ?>
                                                     >
                                                     <span class="attendance-slider"></span>
                                                 </label>
@@ -293,16 +399,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['attendance'])) {
                                 </div>
                                 <div class="card-footer bg-white d-flex justify-content-between">
                                     <small class="text-muted">
-                                        <?php if ($event['type'] === 'meeting'): ?>
-                                            <i class="fas fa-hand-holding-usd text-primary me-1"></i> Deposit meeting
-                                        <?php else: ?>
-                                            <i class="fas fa-money-bill-wave text-warning me-1"></i> Withdrawal day
-                                        <?php endif; ?>
+                                        <?= $event['type'] === 'meeting' ? 
+                                            '<i class="fas fa-hand-holding-usd text-primary me-1"></i> Savings meeting' : 
+                                            '<i class="fas fa-money-bill-wave text-warning me-1"></i> Withdrawal day' ?>
                                     </small>
                                     <?php if ($event['type'] === 'meeting'): ?>
-                                        <button class="btn btn-sm btn-outline-primary">
-                                            <i class="fas fa-envelope me-1"></i> Remind
-                                        </button>
+                                        <form method="POST" style="display: inline;">
+                                            <input type="hidden" name="event_date" value="<?= $event['date'] ?>">
+                                            <input type="hidden" name="event_type" value="<?= $event['type'] ?>">
+                                            <button type="submit" name="send_reminder" class="btn btn-sm btn-outline-primary">
+                                                <i class="fas fa-envelope me-1"></i> Remind
+                                            </button>
+                                        </form>
                                     <?php endif; ?>
                                 </div>
                             </div>
@@ -314,14 +422,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['attendance'])) {
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script>
-        // Toggle all attendance for a specific date
+        // Toggle all attendance for a date
         function toggleAll(date, element) {
-            const checkboxes = document.querySelectorAll(`input[name="attendance[${date}][]"]`);
-            checkboxes.forEach(checkbox => {
-                checkbox.checked = element.checked;
-            });
+            document.querySelectorAll(`input[name="attendance[${date}][]"]`)
+                .forEach(checkbox => checkbox.checked = element.checked);
         }
+
+        // Confirmation for reminders
+        document.querySelectorAll('button[name="send_reminder"]').forEach(button => {
+            button.addEventListener('click', function(e) {
+                if (!confirm('Send reminders for this meeting?')) {
+                    e.preventDefault();
+                }
+            });
+        });
+
+        // Show notifications
+        document.addEventListener('DOMContentLoaded', function() {
+            <?php if (!empty($page_success)): ?>
+            Swal.fire({
+                icon: 'success',
+                title: 'Success',
+                text: '<?= addslashes(htmlspecialchars($page_success)) ?>',
+            });
+            <?php endif; ?>
+
+            <?php if (!empty($page_error)): ?>
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: '<?= addslashes(htmlspecialchars($page_error)) ?>',
+            });
+            <?php endif; ?>
+        });
     </script>
 </body>
 </html>

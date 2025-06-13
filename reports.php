@@ -749,8 +749,7 @@ try {
     <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
 
     <script>
-        // Initialize DataTable
-        $(document).ready(function() {
+      
             $('#dataTable').DataTable({
                 responsive: true,
                 dom: '<"top"lf>rt<"bottom"ip>',

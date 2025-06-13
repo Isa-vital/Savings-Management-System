@@ -1,22 +1,24 @@
 <?php
-require_once __DIR__ . '/../config.php';
-require_once __DIR__ . '/../helpers/auth.php';
+session_start();
 
-require_login();
+// Verify the session file exists and is writable
+if (!file_exists(session_save_path()) || !is_writable(session_save_path())) {
+    die('Session directory not writable: ' . session_save_path());
+}
 
-// Only allow access for Core Admins and Administrators
-if (!has_role(['Core Admin', 'Administrator'])) {
-    $_SESSION['error_message'] = "You do not have permission to access this page.";
-    if (has_role('Member') && isset($_SESSION['user']['member_id'])) {
-        header("Location: " . BASE_URL . "members/my_savings.php");
-    } else {
-        header("Location: " . BASE_URL . "landing.php");
-    }
+// Standardize session check
+if (!isset($_SESSION['admin']['id'])) {
+    header("Location: /savingssystem/auth/login.php");
     exit;
 }
 
+// Database connection
+require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/includes/database.php';
+
 // Initialize variables
 $transactions = [];
+$members = [];
 $filters = [
     'type' => $_GET['type'] ?? '',
     'member_id' => $_GET['member_id'] ?? '',
@@ -25,262 +27,188 @@ $filters = [
 ];
 
 try {
-    // Debug: Verify database connection
-    if (!$pdo) {
-        throw new Exception("Database connection failed");
-    }
+    // Get members list
+    $stmt = $pdo->query("SELECT member_no, full_name FROM memberz ORDER BY full_name");
+    $members = $stmt->fetchAll();
 
-    // Build base query - MODIFIED to use proper table joins
-    $query = "
-        SELECT 
-            t.id,
-            t.transaction_date,
-            t.amount,
-            t.transaction_type,
-            t.reference,
-            m.full_name,
-            m.member_no,
-            l.loan_number AS loan_ref
-        FROM transactions t
-        INNER JOIN memberz m ON t.member_id = m.id
-        LEFT JOIN loans l ON t.loan_id = l.id
-        WHERE 1=1
-    ";
-
+    // Build transactions query
+    $query = "SELECT t.*, m.full_name FROM transactions t 
+              JOIN memberz m ON t.member_id = m.member_no 
+              WHERE 1=1";
     $params = [];
 
-    // Apply filters - MODIFIED to ensure proper parameter binding
     if (!empty($filters['type'])) {
-        $query .= " AND t.transaction_type = :type";
-        $params[':type'] = $filters['type'];
+        $query .= " AND t.transaction_type = ?";
+        $params[] = $filters['type'];
     }
 
     if (!empty($filters['member_id'])) {
-        $query .= " AND t.member_id = :member_id";
-        $params[':member_id'] = (int)$filters['member_id'];
+        $query .= " AND t.member_id = ?";
+        $params[] = $filters['member_id'];
     }
 
-    if (!empty($filters['start_date']) && !empty($filters['end_date'])) {
-        $query .= " AND DATE(t.transaction_date) BETWEEN :start_date AND :end_date";
-        $params[':start_date'] = $filters['start_date'];
-        $params[':end_date'] = $filters['end_date'];
+    if (!empty($filters['start_date'])) {
+        $query .= " AND DATE(t.transaction_date) >= ?";
+        $params[] = $filters['start_date'];
     }
 
-    $query .= " ORDER BY t.transaction_date DESC LIMIT 500";
+    if (!empty($filters['end_date'])) {
+        $query .= " AND DATE(t.transaction_date) <= ?";
+        $params[] = $filters['end_date'];
+    }
 
-    // Debug: Log the query and parameters
-    error_log("Transaction Query: " . $query);
-    error_log("Query Parameters: " . print_r($params, true));
-
-    // Execute query
+    $query .= " ORDER BY t.transaction_date DESC LIMIT 200";
     $stmt = $pdo->prepare($query);
     $stmt->execute($params);
-    $transactions = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-    // Debug: Log query results
-    error_log("Found " . count($transactions) . " transactions");
-
-    // Get members for dropdown
-    $memberStmt = $pdo->query("SELECT id, member_no, full_name FROM memberz ORDER BY full_name");
-    $members = $memberStmt->fetchAll(PDO::FETCH_ASSOC);
+    $transactions = $stmt->fetchAll();
 
 } catch (PDOException $e) {
-    $_SESSION['error'] = "Database error: " . $e->getMessage();
-    error_log("Transactions Error: " . $e->getMessage());
-} catch (Exception $e) {
-    $_SESSION['error'] = "Error: " . $e->getMessage();
-    error_log("General Error: " . $e->getMessage());
+    die("Database error: " . $e->getMessage());
 }
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?= htmlspecialchars(APP_NAME) ?> - Transaction Records</title>
-
-    <!-- Bootstrap -->
+    <title>Transaction Records</title>
+    
+    <!-- Local Bootstrap CSS -->
+    <link href="assets/css/bootstrap.min.css" rel="stylesheet">
+    
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-
+    
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-
+    
+    
     <style>
-        .transaction-card { border-left: 4px solid; }
-        .transaction-deposit { border-left-color: #28a745; }
-        .transaction-withdrawal { border-left-color: #dc3545; }
-        .transaction-loan { border-left-color: #ffc107; }
         .badge-deposit { background-color: #28a745; }
         .badge-withdrawal { background-color: #dc3545; }
         .badge-loan { background-color: #ffc107; color: #212529; }
-        .table-responsive { max-height: 70vh; overflow-y: auto; }
+        .table-container { max-height: 70vh; overflow-y: auto; }
     </style>
 </head>
 <body>
-<div class="container-fluid">
-    <div class="row">
-        <?php include __DIR__ . '/../partials/navbar.php'; ?>
-
-        <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
-            <div class="d-flex justify-content-between align-items-center border-bottom mb-4">
-                <h2><i class="fas fa-exchange-alt me-2"></i>Transaction Records</h2>
-                <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#newTransactionModal">
-                    <i class="fas fa-plus me-1"></i> New Transaction
-                </button>
-            </div>
-
-            <!-- Filters -->
-            <div class="card mb-4">
-                <div class="card-body">
-                    <form method="GET" class="row g-3">
-                        <div class="col-md-3">
-                            <label class="form-label">Transaction Type</label>
-                            <select name="type" class="form-select">
-                                <option value="">All Types</option>
-                                <option value="deposit" <?= $filters['type'] === 'deposit' ? 'selected' : '' ?>>Deposits</option>
-                                <option value="withdrawal" <?= $filters['type'] === 'withdrawal' ? 'selected' : '' ?>>Withdrawals</option>
-                                <option value="loan" <?= $filters['type'] === 'loan' ? 'selected' : '' ?>>Loan Payments</option>
-                            </select>
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label">Member</label>
-                            <select name="member_id" class="form-select">
-                                <option value="">All Members</option>
-                                <?php foreach ($members as $member): ?>
-                                    <option value="<?= $member['id'] ?>" <?= $filters['member_id'] == $member['id'] ? 'selected' : '' ?>>
-                                        <?= htmlspecialchars($member['full_name']) ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <div class="col-md-2">
-                            <label class="form-label">From Date</label>
-                            <input type="date" name="start_date" class="form-control" value="<?= htmlspecialchars($filters['start_date']) ?>">
-                        </div>
-                        <div class="col-md-2">
-                            <label class="form-label">To Date</label>
-                            <input type="date" name="end_date" class="form-control" value="<?= htmlspecialchars($filters['end_date']) ?>">
-                        </div>
-                        <div class="col-md-2 d-flex align-items-end">
-                            <button type="submit" class="btn btn-primary w-100"><i class="fas fa-filter me-1"></i> Filter</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-
-            <!-- Summary -->
-            <div class="row mb-4">
-                <div class="col-md-4">
-                    <div class="card transaction-card transaction-deposit">
-                        <div class="card-body">
-                            <h6 class="text-muted">Total Deposits</h6>
-                            <h3>UGX <?= number_format(array_sum(array_map(fn($t) => $t['transaction_type'] === 'deposit' ? $t['amount'] : 0, $transactions)), 2) ?></h3>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-4">
-                    <div class="card transaction-card transaction-withdrawal">
-                        <div class="card-body">
-                            <h6 class="text-muted">Total Withdrawals</h6>
-                            <h3>UGX <?= number_format(array_sum(array_map(fn($t) => $t['transaction_type'] === 'withdrawal' ? $t['amount'] : 0, $transactions)), 2) ?></h3>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-4">
-                    <div class="card transaction-card transaction-loan">
-                        <div class="card-body">
-                            <h6 class="text-muted">Total Loan Payments</h6>
-                            <h3>UGX <?= number_format(array_sum(array_map(fn($t) => $t['transaction_type'] === 'loan' ? $t['amount'] : 0, $transactions)), 2) ?></h3>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Transaction Table -->
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5><i class="fas fa-list me-2"></i>Transaction History</h5>
-                    <span class="badge bg-primary"><?= count($transactions) ?> records</span>
-                </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-hover mb-0">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>#</th>
-                                    <th>Date/Time</th>
-                                    <th>Member</th>
-                                    <th>Type</th>
-                                    <th>Reference</th>
-                                    <th class="text-end">Amount (UGX)</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php if (empty($transactions)): ?>
-                                    <tr>
-                                        <td colspan="6" class="text-center py-4 text-muted">No transactions found matching your criteria</td>
-                                    </tr>
-                                <?php else: ?>
-                                    <?php foreach ($transactions as $i => $tx): ?>
-                                        <tr>
-                                            <td><?= $i + 1 ?></td>
-                                            <td><?= date('M j, Y H:i', strtotime($tx['transaction_date'])) ?></td>
-                                            <td>
-                                                <a href="<?= BASE_URL ?>members/view.php?id=<?= $tx['member_no'] ?>" class="text-decoration-none">
-                                                    <?= htmlspecialchars($tx['full_name']) ?>
-                                                </a>
-                                            </td>
-                                            <td>
-                                                <span class="badge rounded-pill badge-<?= $tx['transaction_type'] ?>">
-                                                    <?= ucfirst($tx['transaction_type']) ?>
-                                                    <?= $tx['transaction_type'] === 'loan' && !empty($tx['loan_ref']) ? ' #' . $tx['loan_ref'] : '' ?>
-                                                </span>
-                                            </td>
-                                            <td><?= !empty($tx['reference']) ? htmlspecialchars($tx['reference']) : 'N/A' ?></td>
-                                            <td class="text-end <?= $tx['transaction_type'] === 'withdrawal' ? 'text-danger' : 'text-success' ?>">
-                                                <?= $tx['transaction_type'] === 'withdrawal' ? '-' : '+' ?>
-                                                <?= number_format($tx['amount'], 2) ?>
-                                            </td>
-                                        </tr>
+    <div class="container-fluid">
+        <?php include 'partials/navbar.php'; ?>
+        
+        <div class="row">
+            <?php include 'partials/sidebar.php'; ?>
+            
+            <main class="col-md-9 ms-sm-auto px-md-4 py-4">
+                <h2 class="mb-4">Transaction Records</h2>
+                
+                <!-- Filter Form -->
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <form method="get" class="row g-3">
+                            <div class="col-md-3">
+                                <select name="type" class="form-select">
+                                    <option value="">All Types</option>
+                                    <option value="deposit" <?= $filters['type'] === 'deposit' ? 'selected' : '' ?>>Saving Deposits</option>
+                                    <option value="dividend" <?= $filters['type'] === 'dividend' ? 'selected' : '' ?>>Dividend Payments</option>
+                                    <option value="loan_disbursement" <?= $filters['type'] === 'loan_disbursement' ? 'selected' : '' ?>>Loan Disbursements</option>
+                                    <option value="loan_repayment" <?= $filters['type'] === 'loan_repayment' ? 'selected' : '' ?>>Loan Repayments</option>
+                                    <option value="savings_interest" <?= $filters['type'] === 'savings_interest' ? 'selected' : '' ?>>Savings Interest</option>
+                                    <option value="fine_payment" <?= $filters['type'] === 'fine_payment' ? 'selected' : '' ?>>Fine Payments</option>
+                                    <option value="withdrawal" <?= $filters['type'] === 'withdrawal' ? 'selected' : '' ?>>Savings Withdrawals</option>
+                                    <option value="other_transaction" <?= $filters['type'] === 'other_transaction' ? 'selected' : '' ?>>Other Transactions</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <select name="member_id" class="form-select">
+                                    <option value="">All Members</option>
+                                    <?php foreach ($members as $m): ?>
+                                        <option value="<?= $m['member_no'] ?>" <?= $filters['member_id'] == $m['member_no'] ? 'selected' : '' ?>>
+                                            <?= htmlspecialchars($m['full_name']) ?>
+                                        </option>
                                     <?php endforeach; ?>
-                                <?php endif; ?>
-                            </tbody>
-                        </table>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <input type="date" name="start_date" class="form-control" value="<?= $filters['start_date'] ?>">
+                            </div>
+                            <div class="col-md-3">
+                                <input type="date" name="end_date" class="form-control" value="<?= $filters['end_date'] ?>">
+                            </div>
+                            <div class="col-12">
+                                <button type="submit" class="btn btn-primary">Filter</button>
+                                <a href="transactions.php" class="btn btn-secondary">Reset</a>
+                            </div>
+                        </form>
                     </div>
                 </div>
-            </div>
-        </main>
-    </div>
-</div>
 
-<!-- Modal Placeholder -->
-<div class="modal fade" id="newTransactionModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Record New Transaction</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <p class="text-center py-4">Transaction form will appear here</p>
-            </div>
+                <!-- Transactions Table -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="d-flex justify-content-between">
+                            <h5 class="mb-0">Transactions</h5>
+                            <span class="badge bg-primary">
+                                <?= count($transactions) ?> records
+                            </span>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-container">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Date</th>
+                                        <th>Member</th>
+                                        <th>Type</th>
+                                        <th>Amount</th>
+                                        <th>Reference</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php if (empty($transactions)): ?>
+                                        <tr>
+                                            <td colspan="6" class="text-center py-4">No transactions found</td>
+                                        </tr>
+                                    <?php else: ?>
+                                        <?php foreach ($transactions as $i => $tx): ?>
+                                            <tr>
+                                                <td><?= $i + 1 ?></td>
+                                                <td><?= date('M d, Y', strtotime($tx['transaction_date'])) ?></td>
+                                                <td><?= htmlspecialchars($tx['full_name']) ?></td>
+                                                <td>
+                                                    <span class="badge badge-<?= $tx['transaction_type'] ?>">
+                                                        <?= ucfirst($tx['transaction_type']) ?>
+                                                    </span>
+                                                </td>
+                                                <td class="<?= $tx['transaction_type'] === 'deposit' ? 'text-success' : 'text-danger' ?>">
+                                                    <?= $tx['transaction_type'] === 'deposit' ? '+' : '-' ?>
+                                                    <?= number_format($tx['amount'], 2) ?>
+                                                </td>
+                                                <td><?= $tx['reference'] ?? 'N/A' ?></td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    <?php endif; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </main>
         </div>
     </div>
-</div>
 
-<!-- JS -->
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script>
-    document.querySelector('form').addEventListener('submit', function(e) {
-        const startDate = new Date(document.querySelector('[name="start_date"]').value);
-        const endDate = new Date(document.querySelector('[name="end_date"]').value);
-
-        if (startDate > endDate) {
-            alert('End date must be after start date');
-            e.preventDefault();
-        }
-    });
-</script>
+    <!-- Local Bootstrap JS -->
+    <script src="assets/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Simple form validation
+        document.querySelector('form').addEventListener('submit', function(e) {
+            const start = document.querySelector('[name="start_date"]').value;
+            const end = document.querySelector('[name="end_date"]').value;
+            
+            if (start && end && start > end) {
+                alert('End date must be after start date');
+                e.preventDefault();
+            }
+        });
+    </script>
 </body>
 </html>

@@ -60,7 +60,10 @@ $savings = $stmt->fetchAll(PDO::FETCH_ASSOC);
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <input type="text" id="searchInput" class="form-control w-25" placeholder="Search...">
                 <div>
-                    
+            <!--saving deposit button--->
+                    <a href="<?= BASE_URL ?>savings/savings.php" class="btn btn-sm btn-outline-success me-2">
+                        <i class="fas fa-plus me-1"></i> Add Savings
+                    </a>
                     <button onclick="exportCSV()" class="btn btn-sm btn-outline-success me-2">Export CSV</button>
                     <button onclick="downloadPDF()" class="btn btn-sm btn-outline-primary">Download PDF</button>
                 </div>
