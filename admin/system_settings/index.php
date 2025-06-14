@@ -89,6 +89,72 @@ $page_title = "System Settings";
                     <button type="submit" class="btn btn-primary">Save Settings</button>
                 </form>
 
+                <?php
+                // Simulate fetching current savings year status
+                $current_savings_year_status = "No active savings year.";
+                // Example of active year:
+                // $current_savings_year_status = "Active Savings Year: 2023-2024 (Started: 2023-07-01)";
+
+                // In a real implementation, this would be fetched from the database:
+                // try {
+                //     $stmt = $pdo->query("SELECT name, start_date, status FROM savings_years WHERE status = 'active' ORDER BY start_date DESC LIMIT 1");
+                //     $active_year = $stmt->fetch(PDO::FETCH_ASSOC);
+                //     if ($active_year) {
+                //         $current_savings_year_status = "Active Savings Year: " . htmlspecialchars($active_year['name']) . " (Started: " . htmlspecialchars(date('Y-m-d', strtotime($active_year['start_date']))) . ")";
+                //     } else {
+                //         $stmt_latest_closed = $pdo->query("SELECT name, end_date FROM savings_years WHERE status = 'closed' ORDER BY end_date DESC LIMIT 1");
+                //         $latest_closed_year = $stmt_latest_closed->fetch(PDO::FETCH_ASSOC);
+                //         if ($latest_closed_year) {
+                //             $current_savings_year_status = "No active savings year. Latest closed year: " . htmlspecialchars($latest_closed_year['name']) . " (Ended: " . htmlspecialchars(date('Y-m-d', strtotime($latest_closed_year['end_date']))) . ")";
+                //         } else {
+                //             $current_savings_year_status = "No active savings year and no past year records found.";
+                //         }
+                //     }
+                // } catch (PDOException $e) {
+                //     $current_savings_year_status = "Error fetching savings year status: " . $e->getMessage();
+                //     // Log this error properly in a real application
+                // }
+                ?>
+                <div class="alert alert-info mt-3" role="alert">
+                    <strong>Current Status:</strong> <?php echo $current_savings_year_status; ?>
+                </div>
+
+                <div class="card mt-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Savings Year Management</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-text">Use the actions below to manage the savings year.</p>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="card mb-3">
+                                    <div class="card-body">
+                                        <h6 class="card-title">Close Current Savings Year</h6>
+                                        <p class="card-text small">This action will close the current active savings year, calculate interests, and prepare the system for a new savings period. Ensure all transactions for the current year are finalized.</p>
+                                        <form action="close_savings_year.php" method="POST" onsubmit="return confirm('Are you sure you want to close the current savings year? This action cannot be undone easily.');">
+                                            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(generateToken()); ?>">
+                                            <button type="submit" class="btn btn-warning">Close Savings Year</button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="card mb-3">
+                                    <div class="card-body">
+                                        <h6 class="card-title">Start New Savings Year</h6>
+                                        <p class="card-text small">This action will initiate a new savings year. This should typically be done after the previous year has been closed.</p>
+                                        <form action="start_savings_year.php" method="POST" onsubmit="return confirm('Are you sure you want to start a new savings year?');">
+                                            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(generateToken()); ?>">
+                                            <button type="submit" class="btn btn-success">Start New Savings Year</button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
             </main>
         </div>
     </div>
