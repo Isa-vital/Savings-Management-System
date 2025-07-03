@@ -55,12 +55,6 @@ $transactions = $stmt->fetchAll();
     // Top 5 Saving Members
     $top_members = ['labels' => [], 'data' => []];
     $stmt = $pdo->query("
-        SELECT m.full_name, SUM(s.amount) as total
-        FROM savings s
-        JOIN memberz m ON CAST(s.id AS CHAR) = CAST(m.id AS CHAR)
-        GROUP BY s.id
-        ORDER BY total DESC
-        LIMIT 5
     ");
     while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
         $top_members['labels'][] = $row['full_name'];

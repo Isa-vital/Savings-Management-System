@@ -188,18 +188,22 @@ $is_logged_in_user = function_exists('is_logged_in') ? is_logged_in() : (functio
                             <i class="fas fa-hand-holding-usd me-2"></i> Apply for Loan
                         </a>
                     </li>
-                    <!--repay loan---->
+                    <!--repay loan-->
                     <li class="nav-item">
                         <a class="nav-link" href="<?php echo htmlspecialchars(BASE_URL . 'members/add_loan_repayment.php'); ?>">
                             <i class="fas fa-money-bill-wave me-2"></i> Repay Loan
                         </a>
+                    <!--repay loan---->
+                    </li>
+                    <!---my loan history-->
+                    
                     <li class="nav-item">
                         <a class="nav-link" href="<?php echo htmlspecialchars(BASE_URL . 'profile.php'); // Assuming general profile page ?>">
                             <i class="fas fa-user-edit me-2"></i> My Profile
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="<?php echo htmlspecialchars(BASE_URL . 'Calendar.php'); ?>">
+                        <a class="nav-link" href="<?php echo htmlspecialchars(BASE_URL . 'usercalendar.php'); ?>">
                             <i class="fas fa-calendar-alt me-2"></i> Calendar
                         </a>
                     </li>

@@ -1,186 +1,216 @@
 <?php
+session_start();
+
+// Redirect if not logged in
+if (!isset($_SESSION['user']['id'])) {
+    header("Location: /savingssystem/auth/login.php");
+    exit;
+}
+
+// Load dependencies
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../helpers/auth.php';
 
 require_login();
 
-// Only allow access for Core Admins and Administrators
-if (!has_role(['Core Admin', 'Administrator'])) {
-    $_SESSION['error_message'] = "You do not have permission to access this page.";
-    if (has_role('Member') && isset($_SESSION['user']['member_id'])) {
-        header("Location: " . BASE_URL . "members/my_savings.php");
-    } else {
-        header("Location: " . BASE_URL . "landing.php");
-    }
+if (!has_role('Member') || !isset($_SESSION['user']['member_id']) || empty($_SESSION['user']['member_id'])) {
+    $_SESSION['error_message'] = "You must be a logged-in member to make a loan repayment.";
+    header("Location: " . BASE_URL . "index.php");
     exit;
 }
 
-$loan_id = intval($_GET['loan_id']);
+$current_user_id = $_SESSION['user']['id'];
+$current_member_id = $_SESSION['user']['member_id'];
+$page_title = "Make Loan Repayment";
+$currency_symbol = defined('APP_CURRENCY_SYMBOL') ? APP_CURRENCY_SYMBOL : 'UGX';
 
-// Function to generate reference number
-function generateReferenceNumber($loan_number) {
-    $prefix = 'PAY-';
-    $date = date('Ymd');
-    $random = strtoupper(substr(md5(uniqid()), 0, 6));
-    return $prefix . $loan_number . '-' . $date . '-' . $random;
+$active_loans = [];
+$loans_with_balances = []; 
+
+try {
+    // Fetch member's approved/completed loans with outstanding balances
+    $stmt_loans = $pdo->prepare("
+        SELECT 
+            l.id as loan_id, 
+            l.loan_number, 
+            l.amount as amount_approved, 
+            l.total_repayment,
+            l.status as loan_status,
+            l.application_date,
+            COALESCE(SUM(CASE WHEN lr.status = 'paid' THEN lr.amount_paid ELSE 0 END), 0) as total_paid_verified
+        FROM loans l
+        LEFT JOIN loan_repayment lr ON l.id = lr.loan_id
+        WHERE l.member_id = :member_id 
+          AND l.status IN ('approved', 'completed')
+        GROUP BY l.id, l.loan_number, l.amount, l.total_repayment, l.status, l.application_date
+        HAVING COALESCE(SUM(lr.amount_paid), 0) < l.total_repayment
+        ORDER BY l.application_date ASC
+    ");
+    
+    $stmt_loans->bindParam(':member_id', $current_member_id, PDO::PARAM_INT);
+    $stmt_loans->execute();
+    $active_loans = $stmt_loans->fetchAll(PDO::FETCH_ASSOC);
+
+    foreach ($active_loans as $loan) {
+        $outstanding_balance = $loan['total_repayment'] - $loan['total_paid_verified'];
+        if ($outstanding_balance > 0.001) {
+            $loan['outstanding_balance'] = $outstanding_balance;
+            $loans_with_balances[] = $loan;
+        }
+    }
+    
+} catch (PDOException $e) {
+    error_log("Error fetching member's active loans: " . $e->getMessage());
+    $_SESSION['error_message'] = "Could not load your loan details. Please try again later.";
 }
 
-// Fetch loan details with interest calculation
-try {
-    $stmt = $pdo->prepare("SELECT l.*, m.full_name, m.member_no 
-                          FROM loans l
-                          JOIN memberz m ON l.member_id = m.id
-                          WHERE l.id = :loan_id AND l.status = 'approved'");
-    $stmt->execute([':loan_id' => $loan_id]);
-    $loan = $stmt->fetch(PDO::FETCH_ASSOC);
+// Notification handling
+$sa_error = $_SESSION['error_message'] ?? '';
+if(isset($_SESSION['error_message'])) unset($_SESSION['error_message']);
+$sa_success = $_SESSION['success_message'] ?? '';
+if(isset($_SESSION['success_message'])) unset($_SESSION['success_message']);
 
-    if (!$loan) {
-        $_SESSION['error'] = "Loan not found or not approved";
-        header('Location: loanslist.php');
+$form_errors_for_sa = $_SESSION['form_errors'] ?? [];
+$form_values = $_SESSION['form_values'] ?? [];
+unset($_SESSION['form_errors'], $_SESSION['form_values']);
+
+$payment_methods = ['Mobile Money', 'Airtel Money', 'Bank Deposit', 'Cash at Office', 'Other'];
+$current_date = date('Y-m-d');
+
+// Process repayment submission
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $form_values = $_POST;
+
+    if (!isset($_POST['csrf_token']) || !validateToken($_POST['csrf_token'])) {
+        $_SESSION['error_message'] = 'CSRF token validation failed. Please try again.';
+        header("Location: " . BASE_URL . "members/make_repayment.php"); 
         exit;
     }
 
-    // Calculate total loan amount (principal + interest)
-    $total_loan_amount = $loan['amount'] + ($loan['amount'] * ($loan['interest_rate'] / 100));
+    $loan_id = filter_input(INPUT_POST, 'loan_id', FILTER_VALIDATE_INT);
+    $amount_paid = filter_input(INPUT_POST, 'amount_paid', FILTER_VALIDATE_FLOAT);
+    $repayment_date = sanitize($_POST['repayment_date'] ?? '');
+    $payment_method = sanitize($_POST['payment_method'] ?? '');
+    $transaction_reference = sanitize($_POST['transaction_reference'] ?? '');
+    $notes = sanitize($_POST['notes'] ?? '');
+    $proof_document_file = $_FILES['proof_document'] ?? null;
+    $proof_document_path_to_save = null;
+    $form_errors = [];
 
-    // Calculate total paid and outstanding balance
-    $stmt = $pdo->prepare("SELECT COALESCE(SUM(amount_paid), 0) as total_paid FROM loan_repayments WHERE loan_id = :loan_id");
-    $stmt->execute([':loan_id' => $loan_id]);
-    $total_paid = $stmt->fetchColumn();
-    $outstanding = max(0, $total_loan_amount - $total_paid); // Ensure not negative
-
-    // Fetch pending repayments
-    $stmt = $pdo->prepare("SELECT * FROM loan_repayments 
-                          WHERE loan_id = :loan_id AND status = 'pending'
-                          ORDER BY due_date ASC");
-    $stmt->execute([':loan_id' => $loan_id]);
-    $pending_repayments = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-} catch (PDOException $e) {
-    $_SESSION['error'] = "Database error: " . $e->getMessage();
-    header('Location: loanslist.php');
-    exit;
-}
-
-// Process form submission
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $pdo->beginTransaction();
-    
-    try {
-        $payment_type = sanitize($_POST['payment_type']);
-        $amount = floatval($_POST['amount']);
-        $payment_date = sanitize($_POST['payment_date']);
-        $payment_method = sanitize($_POST['payment_method']);
-        $notes = sanitize($_POST['notes']);
-        $admin_id = $_SESSION['user']['id'];
-        
-        // Auto-generate reference number
-        $reference_number = generateReferenceNumber($loan['loan_number']);
-        
-        // Validate amount
-        if ($amount <= 0) {
-            throw new Exception("Amount must be positive");
+    // Validation
+    if (empty($loan_id)) {
+        $form_errors['loan_id'] = "Please select the loan you are repaying.";
+    } else {
+        $valid_loan = false;
+        foreach ($loans_with_balances as $loan) {
+            if ($loan['loan_id'] == $loan_id) {
+                $valid_loan = true;
+                break;
+            }
         }
-        
-        if ($payment_type === 'installment') {
-            $repayment_id = intval($_POST['repayment_id']);
-            
-            // Validate against installment amount
-            $stmt = $pdo->prepare("SELECT amount FROM loan_repayments WHERE id = :id AND loan_id = :loan_id");
-            $stmt->execute([':id' => $repayment_id, ':loan_id' => $loan_id]);
-            $repayment = $stmt->fetch();
-            
-            if (!$repayment) {
-                throw new Exception("Invalid repayment record");
-            }
+        if (!$valid_loan) {
+            $form_errors['loan_id'] = "Invalid loan selected for repayment.";
+        }
+    }
 
-            if ($amount > $repayment['amount']) {
-                throw new Exception("Amount cannot exceed the installment amount");
-            }
-            
-            $repayment_data = [
-                ':repayment_id' => $repayment_id,
-                ':amount_paid' => $amount
-            ];
+    if ($amount_paid === false || $amount_paid <= 0) {
+        $form_errors['amount_paid'] = "Amount paid must be a positive number.";
+    }
+
+    if (empty($repayment_date)) {
+        $form_errors['repayment_date'] = "Repayment date is required.";
+    } elseif (strtotime($repayment_date) === false) {
+        $form_errors['repayment_date'] = "Invalid repayment date format.";
+    }
+
+    if (empty($payment_method) || !in_array($payment_method, $payment_methods)) {
+        $form_errors['payment_method'] = "Please select a valid payment method.";
+    }
+
+    if (empty($transaction_reference)) {
+        $form_errors['transaction_reference'] = "Transaction reference is required.";
+    }
+
+    // File upload validation
+    if (!isset($proof_document_file) || $proof_document_file['error'] == UPLOAD_ERR_NO_FILE) {
+        $form_errors['proof_document'] = "Proof of payment document is required.";
+    } elseif ($proof_document_file['error'] == UPLOAD_ERR_OK) {
+        $allowed_mime_types = ['application/pdf', 'image/jpeg', 'image/png'];
+        $max_file_size = 5 * 1024 * 1024; // 5MB
+        
+        $file_info = finfo_open(FILEINFO_MIME_TYPE);
+        $mime_type = finfo_file($file_info, $proof_document_file['tmp_name']);
+        finfo_close($file_info);
+        
+        if (!in_array($mime_type, $allowed_mime_types)) {
+            $form_errors['proof_document'] = "Invalid file type. Only PDF, JPG, PNG are allowed.";
+        } elseif ($proof_document_file['size'] > $max_file_size) {
+            $form_errors['proof_document'] = "File is too large. Maximum size is 5MB.";
         } else {
-            // Manual payment - validate against outstanding balance
-            if ($amount > $outstanding) {
-                throw new Exception("Amount cannot exceed the outstanding balance of UGX " . number_format($outstanding, 2));
+            $upload_dir = __DIR__ . '/../assets/uploads/repayment_proofs/';
+            if (!is_dir($upload_dir)) {
+                mkdir($upload_dir, 0775, true);
             }
             
-            $repayment_data = [
-                ':repayment_id' => null,
-                ':amount_paid' => $amount
-            ];
+            $file_extension = pathinfo($proof_document_file['name'], PATHINFO_EXTENSION);
+            $unique_file_name = 'repayment_' . $loan_id . '_' . time() . '.' . $file_extension;
+            $destination_path = $upload_dir . $unique_file_name;
             
-            // Create a new repayment record for manual payments
-            $stmt = $pdo->prepare("INSERT INTO loan_repayments 
-                                  (loan_id, amount, due_date, status, payment_date, amount_paid)
-                                  VALUES 
-                                  (:loan_id, :amount, :due_date, 'paid', :payment_date, :amount_paid)");
+            if (move_uploaded_file($proof_document_file['tmp_name'], $destination_path)) {
+                $proof_document_path_to_save = 'assets/uploads/repayment_proofs/' . $unique_file_name;
+            } else {
+                $form_errors['proof_document'] = "Failed to upload proof document. Please try again.";
+            }
+        }
+    }
+
+    if (empty($form_errors)) {
+        try {
+            $pdo->beginTransaction();
+            
+            // Insert repayment record
+            $stmt = $pdo->prepare("
+                INSERT INTO loan_repayment (
+                    loan_id, 
+                    amount, 
+                    amount_paid, 
+                    payment_date, 
+                    status,
+                    created_at
+                ) VALUES (
+                    :loan_id, 
+                    :amount, 
+                    :amount_paid, 
+                    :payment_date, 
+                    'paid',
+                    NOW()
+                )
+            ");
+            
             $stmt->execute([
                 ':loan_id' => $loan_id,
-                ':amount' => $amount,
-                ':due_date' => $payment_date,
-                ':payment_date' => $payment_date,
-                ':amount_paid' => $amount
+                ':amount' => $amount_paid,
+                ':amount_paid' => $amount_paid,
+                ':payment_date' => $repayment_date
             ]);
             
-            $repayment_id = $pdo->lastInsertId();
-            $repayment_data[':repayment_id'] = $repayment_id;
+            $pdo->commit();
+            
+            $_SESSION['success_message'] = "Loan repayment submitted successfully!";
+            header("Location: " . BASE_URL . "members/make_repayment.php");
+            exit;
+            
+        } catch (PDOException $e) {
+            $pdo->rollBack();
+            error_log("Repayment submission failed: " . $e->getMessage());
+            $_SESSION['error_message'] = "Failed to submit repayment. Please try again.";
         }
-
-        // Record payment
-        $stmt = $pdo->prepare("INSERT INTO payments 
-                              (loan_id, repayment_id, amount, payment_date, 
-                               payment_method, reference_number, received_by, notes, payment_type)
-                              VALUES 
-                              (:loan_id, :repayment_id, :amount, :payment_date, 
-                               :payment_method, :reference_number, :received_by, :notes, :payment_type)");
-        $stmt->execute([
-            ':loan_id' => $loan_id,
-            ':repayment_id' => $repayment_data[':repayment_id'],
-            ':amount' => $amount,
-            ':payment_date' => $payment_date,
-            ':payment_method' => $payment_method,
-            ':reference_number' => $reference_number,
-            ':received_by' => $admin_id,
-            ':notes' => $notes,
-            ':payment_type' => $payment_type
-        ]);
-
-        // Update repayment status if paying an installment
-        if ($payment_type === 'installment') {
-            $stmt = $pdo->prepare("UPDATE loan_repayments 
-                                  SET status = 'paid', 
-                                      payment_date = :payment_date,
-                                      amount_paid = :amount_paid
-                                  WHERE id = :repayment_id");
-            $stmt->execute([
-                ':payment_date' => $payment_date,
-                ':amount_paid' => $repayment_data[':amount_paid'],
-                ':repayment_id' => $repayment_data[':repayment_id']
-            ]);
-        }
-
-        // Update loan status if fully paid
-        $stmt = $pdo->prepare("SELECT COALESCE(SUM(amount_paid), 0) as total_paid FROM loan_repayments WHERE loan_id = :loan_id");
-        $stmt->execute([':loan_id' => $loan_id]);
-        $total_paid = $stmt->fetchColumn();
-        
-        if ($total_paid >= $total_loan_amount) {
-            $stmt = $pdo->prepare("UPDATE loans SET status = 'completed' WHERE id = :loan_id");
-            $stmt->execute([':loan_id' => $loan_id]);
-        }
-
-        $pdo->commit();
-        $_SESSION['success'] = "Payment recorded successfully. Reference: " . $reference_number;
-        header("Location: viewloan.php?id=$loan_id");
+    } else {
+        $_SESSION['form_errors'] = $form_errors;
+        $_SESSION['form_values'] = $form_values;
+        $_SESSION['error_message'] = "Please correct the errors in the form.";
+        header("Location: " . BASE_URL . "members/make_repayment.php");
         exit;
-
-    } catch (Exception $e) {
-        $pdo->rollBack();
-        $_SESSION['error'] = "Error recording payment: " . $e->getMessage();
     }
 }
 ?>
@@ -190,223 +220,189 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Record Payment - <?= APP_NAME ?></title>
+    <title><?= htmlspecialchars($page_title) . ' - ' . htmlspecialchars(APP_NAME) ?></title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
     <style>
-        .payment-card {
-            border-left: 4px solid #28a745;
+        .loan-card {
+            border-left: 4px solid #4e73df;
+            margin-bottom: 1rem;
         }
-        .payment-type-tabs .nav-link {
-            cursor: pointer;
+        .invalid-feedback {
+            display: block;
         }
-        #manualPaymentFields, #installmentPaymentFields {
-            display: none;
-        }
-        .balance-zero {
-            color: #28a745;
-            font-weight: bold;
+        .is-invalid {
+            border-color: #e74a3b;
         }
     </style>
 </head>
 <body>
     <?php include __DIR__ . '/../partials/navbar.php'; ?>
-    
+
     <div class="container-fluid">
         <div class="row">
             <?php include __DIR__ . '/../partials/sidebar.php'; ?>
-            
+
             <main class="col-md-9 ms-sm-auto px-md-4 py-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">
-                        <i class="fas fa-money-bill-wave me-2"></i>Record Loan Payment
-                    </h1>
-                    <div class="btn-toolbar mb-2 mb-md-0">
-                        <a href="viewloan.php?id=<?= $loan_id ?>" class="btn btn-sm btn-outline-secondary">
-                            <i class="fas fa-arrow-left me-1"></i> Back to Loan
-                        </a>
-                    </div>
+                    <h1 class="h2"><i class="fas fa-money-check-alt me-2"></i><?= htmlspecialchars($page_title) ?></h1>
                 </div>
 
-                <?php if (isset($_SESSION['error'])): ?>
-                    <div class="alert alert-danger"><?= $_SESSION['error']; unset($_SESSION['error']); ?></div>
-                <?php endif; ?>
-
-                <div class="card payment-card mb-4">
-                    <div class="card-header">
-                        <h5 class="mb-0">
-                            <i class="fas fa-info-circle me-2"></i>Loan Details
-                        </h5>
+                <?php if (empty($loans_with_balances)): ?>
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        You have no active loans with an outstanding balance.
                     </div>
-                    <div class="card-body">
-                        <div class="row">
-                            <div class="col-md-6">
-                                <p><strong>Member:</strong> <?= htmlspecialchars($loan['full_name']) ?> (<?= $loan['member_no'] ?>)</p>
-                                <p><strong>Principal Amount:</strong> UGX <?= number_format($loan['amount'], 2) ?></p>
-                                <p><strong>Interest Rate:</strong> <?= $loan['interest_rate'] ?>%</p>
+                <?php else: ?>
+                    <div class="mb-4">
+                        <h5 class="mb-3">Your Active Loans with Outstanding Balances:</h5>
+                        <?php foreach ($loans_with_balances as $loan): ?>
+                            <div class="card loan-card mb-3">
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-3"><strong>Loan #:</strong> <?= htmlspecialchars($loan['loan_number']) ?></div>
+                                        <div class="col-md-3"><strong>Amount:</strong> <?= htmlspecialchars($currency_symbol . ' ' . number_format($loan['amount_approved'], 2)) ?></div>
+                                        <div class="col-md-3"><strong>Paid:</strong> <?= htmlspecialchars($currency_symbol . ' ' . number_format($loan['total_paid_verified'], 2)) ?></div>
+                                        <div class="col-md-3"><strong>Balance:</strong> <?= htmlspecialchars($currency_symbol . ' ' . number_format($loan['outstanding_balance'], 2)) ?></div>
+                                    </div>
+                                </div>
                             </div>
-                            <div class="col-md-6">
-                                <p><strong>Loan ID:</strong> <?= $loan['loan_number'] ?></p>
-                                <p><strong>Total Loan Amount:</strong> UGX <?= number_format($total_loan_amount, 2) ?></p>
-                                <p><strong>Outstanding Balance:</strong> 
-                                    <?php if ($outstanding <= 0): ?>
-                                        <span class="balance-zero">UGX 0.00 (Fully Paid)</span>
-                                    <?php else: ?>
-                                        UGX <?= number_format($outstanding, 2) ?>
-                                    <?php endif; ?>
-                                </p>
-                            </div>
+                        <?php endforeach; ?>
+                    </div>
+
+                    <div class="card shadow">
+                        <div class="card-header bg-primary text-white">
+                            Submit Repayment Details
                         </div>
-                    </div>
-                </div>
+                        <div class="card-body">
+                            <form method="POST" action="make_repayment.php" enctype="multipart/form-data">
+                                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(generateToken()) ?>">
 
-                <div class="card">
-                    <div class="card-header">
-                        <h5 class="mb-0">
-                            <i class="fas fa-credit-card me-2"></i>Payment Information
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <form method="POST">
-                            <input type="hidden" name="payment_type" id="paymentType" value="installment">
-                            
-                            <ul class="nav nav-tabs payment-type-tabs mb-4">
-                                <li class="nav-item">
-                                    <a class="nav-link active" data-payment-type="installment">
-                                        <i class="fas fa-calendar-check me-1"></i> Installment Payment
-                                    </a>
-                                </li>
-                                <li class="nav-item">
-                                    <a class="nav-link" data-payment-type="manual">
-                                        <i class="fas fa-hand-holding-usd me-1"></i> Manual Payment
-                                    </a>
-                                </li>
-                            </ul>
-
-                            <div id="installmentPaymentFields">
                                 <div class="row mb-3">
                                     <div class="col-md-6">
-                                        <label for="repayment_id" class="form-label">Select Payment Installment</label>
-                                        <select class="form-select" id="repayment_id" name="repayment_id">
-                                            <option value="">-- Select installment --</option>
-                                            <?php foreach ($pending_repayments as $repayment): ?>
-                                                <option value="<?= $repayment['id'] ?>" 
-                                                    data-due-amount="<?= $repayment['amount'] ?>">
-                                                    Installment due <?= date('d M Y', strtotime($repayment['due_date'])) ?> - 
-                                                    UGX <?= number_format($repayment['amount'], 2) ?>
+                                        <label for="loan_id" class="form-label">Select Loan <span class="text-danger">*</span></label>
+                                        <select name="loan_id" id="loan_id" class="form-select <?= isset($form_errors_for_sa['loan_id']) ? 'is-invalid' : '' ?>" required>
+                                            <option value="">-- Select Loan --</option>
+                                            <?php foreach ($loans_with_balances as $loan): ?>
+                                                <option value="<?= htmlspecialchars($loan['loan_id']) ?>" <?= (isset($form_values['loan_id']) && $form_values['loan_id'] == $loan['loan_id']) ? 'selected' : '' ?>>
+                                                    Loan #<?= htmlspecialchars($loan['loan_number']) ?> (Balance: <?= htmlspecialchars($currency_symbol . ' ' . number_format($loan['outstanding_balance'], 2)) ?>)
                                                 </option>
                                             <?php endforeach; ?>
                                         </select>
+                                        <?php if (isset($form_errors_for_sa['loan_id'])): ?>
+                                            <div class="invalid-feedback"><?= htmlspecialchars($form_errors_for_sa['loan_id']) ?></div>
+                                        <?php endif; ?>
                                     </div>
                                     <div class="col-md-6">
-                                        <label for="amount" class="form-label">Amount Paid</label>
-                                        <div class="input-group">
-                                            <span class="input-group-text">UGX</span>
-                                            <input type="number" step="0.01" class="form-control" id="amount" name="amount" required>
-                                        </div>
+                                        <label for="amount_paid" class="form-label">Amount Paid <span class="text-danger">*</span></label>
+                                        <input type="number" name="amount_paid" id="amount_paid" class="form-control <?= isset($form_errors_for_sa['amount_paid']) ? 'is-invalid' : '' ?>" 
+                                               value="<?= htmlspecialchars($form_values['amount_paid'] ?? '') ?>" required min="0.01" step="0.01">
+                                        <?php if (isset($form_errors_for_sa['amount_paid'])): ?>
+                                            <div class="invalid-feedback"><?= htmlspecialchars($form_errors_for_sa['amount_paid']) ?></div>
+                                        <?php endif; ?>
                                     </div>
                                 </div>
-                            </div>
 
-                            <div id="manualPaymentFields">
                                 <div class="row mb-3">
-                                    <div class="col-md-12">
-                                        <div class="alert alert-info">
-                                            <i class="fas fa-info-circle me-2"></i>
-                                            You can record a partial or full payment that doesn't match any scheduled installment.
-                                        </div>
+                                    <div class="col-md-6">
+                                        <label for="repayment_date" class="form-label">Repayment Date <span class="text-danger">*</span></label>
+                                        <input type="date" name="repayment_date" id="repayment_date" class="form-control <?= isset($form_errors_for_sa['repayment_date']) ? 'is-invalid' : '' ?>" 
+                                               value="<?= htmlspecialchars($form_values['repayment_date'] ?? $current_date) ?>" required max="<?= $current_date ?>">
+                                        <?php if (isset($form_errors_for_sa['repayment_date'])): ?>
+                                            <div class="invalid-feedback"><?= htmlspecialchars($form_errors_for_sa['repayment_date']) ?></div>
+                                        <?php endif; ?>
                                     </div>
-                                    <div class="col-md-12">
-                                        <label for="manual_amount" class="form-label">Amount Paid</label>
-                                        <div class="input-group">
-                                            <span class="input-group-text">UGX</span>
-                                            <input type="number" step="0.01" class="form-control" id="manual_amount" name="amount" 
-                                                   max="<?= $outstanding ?>" placeholder="Enter payment amount" required>
-                                        </div>
-                                        <small class="text-muted">Maximum: UGX <?= number_format($outstanding, 2) ?></small>
+                                    <div class="col-md-6">
+                                        <label for="payment_method" class="form-label">Payment Method <span class="text-danger">*</span></label>
+                                        <select name="payment_method" id="payment_method" class="form-select <?= isset($form_errors_for_sa['payment_method']) ? 'is-invalid' : '' ?>" required>
+                                            <option value="">-- Select Method --</option>
+                                            <?php foreach ($payment_methods as $method): ?>
+                                                <option value="<?= htmlspecialchars($method) ?>" <?= (isset($form_values['payment_method']) && $form_values['payment_method'] == $method) ? 'selected' : '' ?>>
+                                                    <?= htmlspecialchars($method) ?>
+                                                </option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                        <?php if (isset($form_errors_for_sa['payment_method'])): ?>
+                                            <div class="invalid-feedback"><?= htmlspecialchars($form_errors_for_sa['payment_method']) ?></div>
+                                        <?php endif; ?>
                                     </div>
                                 </div>
-                            </div>
 
-                            <div class="row mb-3">
-                                <div class="col-md-4">
-                                    <label for="payment_date" class="form-label">Payment Date</label>
-                                    <input type="date" class="form-control" id="payment_date" name="payment_date" 
-                                           value="<?= date('Y-m-d') ?>" required>
+                                <div class="mb-3">
+                                    <label for="transaction_reference" class="form-label">Transaction Reference <span class="text-danger">*</span></label>
+                                    <input type="text" name="transaction_reference" id="transaction_reference" class="form-control <?= isset($form_errors_for_sa['transaction_reference']) ? 'is-invalid' : '' ?>" 
+                                           value="<?= htmlspecialchars($form_values['transaction_reference'] ?? '') ?>" required>
+                                    <small class="text-muted">E.g., Mobile Money TX ID, Bank Slip No.</small>
+                                    <?php if (isset($form_errors_for_sa['transaction_reference'])): ?>
+                                        <div class="invalid-feedback"><?= htmlspecialchars($form_errors_for_sa['transaction_reference']) ?></div>
+                                    <?php endif; ?>
                                 </div>
-                                <div class="col-md-4">
-                                    <label for="payment_method" class="form-label">Payment Method</label>
-                                    <select class="form-select" id="payment_method" name="payment_method" required>
-                                        <option value="cash">Cash</option>
-                                        <option value="mobile_money">Mobile Money</option>
-                                        <option value="bank_transfer">Bank Transfer</option>
-                                        <option value="check">Check</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label">Reference Number</label>
-                                    <input type="text" class="form-control" value="Will be auto-generated" readonly>
-                                </div>
-                            </div>
 
-                            <div class="mb-3">
-                                <label for="notes" class="form-label">Notes</label>
-                                <textarea class="form-control" id="notes" name="notes" rows="3"></textarea>
-                            </div>
+                                <div class="mb-3">
+                                    <label for="proof_document" class="form-label">Proof of Payment <span class="text-danger">*</span></label>
+                                    <input type="file" name="proof_document" id="proof_document" class="form-control <?= isset($form_errors_for_sa['proof_document']) ? 'is-invalid' : '' ?>" 
+                                           required accept="application/pdf,image/jpeg,image/png">
+                                    <small class="text-muted">Max file size: 5MB. Allowed types: PDF, JPG, PNG</small>
+                                    <?php if (isset($form_errors_for_sa['proof_document'])): ?>
+                                        <div class="invalid-feedback"><?= htmlspecialchars($form_errors_for_sa['proof_document']) ?></div>
+                                    <?php endif; ?>
+                                </div>
 
-                            <button type="submit" class="btn btn-success">
-                                <i class="fas fa-save me-1"></i> Record Payment
-                            </button>
-                        </form>
+                                <div class="mb-3">
+                                    <label for="notes" class="form-label">Notes (Optional)</label>
+                                    <textarea name="notes" id="notes" class="form-control" rows="3"><?= htmlspecialchars($form_values['notes'] ?? '') ?></textarea>
+                                </div>
+
+                                <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                                    <button type="submit" class="btn btn-primary me-md-2">
+                                        <i class="fas fa-check-circle me-1"></i> Submit Repayment
+                                    </button>
+                                    <a href="<?= BASE_URL ?>index.php" class="btn btn-secondary">
+                                        <i class="fas fa-times me-1"></i> Cancel
+                                    </a>
+                                </div>
+                            </form>
+                        </div>
                     </div>
-                </div>
+                <?php endif; ?>
             </main>
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script>
-        // Payment type tabs
-        document.querySelectorAll('.payment-type-tabs .nav-link').forEach(tab => {
-            tab.addEventListener('click', function() {
-                const paymentType = this.getAttribute('data-payment-type');
-                
-                // Update active tab
-                document.querySelectorAll('.payment-type-tabs .nav-link').forEach(t => {
-                    t.classList.remove('active');
-                });
-                this.classList.add('active');
-                
-                // Update hidden field
-                document.getElementById('paymentType').value = paymentType;
-                
-                // Show/hide fields
-                if (paymentType === 'installment') {
-                    document.getElementById('installmentPaymentFields').style.display = 'block';
-                    document.getElementById('manualPaymentFields').style.display = 'none';
-                    document.getElementById('amount').required = true;
-                    document.getElementById('manual_amount').required = false;
-                } else {
-                    document.getElementById('installmentPaymentFields').style.display = 'none';
-                    document.getElementById('manualPaymentFields').style.display = 'block';
-                    document.getElementById('amount').required = false;
-                    document.getElementById('manual_amount').required = true;
-                }
-            });
-        });
-
-        // Auto-set amount to full due amount when installment is selected
-        document.getElementById('repayment_id').addEventListener('change', function() {
-            const selectedOption = this.options[this.selectedIndex];
-            if (selectedOption.value) {
-                const dueAmount = selectedOption.getAttribute('data-due-amount');
-                document.getElementById('amount').value = dueAmount;
-            }
-        });
-
-        // Initialize showing the correct fields
         document.addEventListener('DOMContentLoaded', function() {
-            document.getElementById('installmentPaymentFields').style.display = 'block';
+            <?php if (!empty($sa_error)): ?>
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: '<?= addslashes($sa_error) ?>',
+                });
+            <?php endif; ?>
+            
+            <?php if (!empty($sa_success)): ?>
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Success',
+                    text: '<?= addslashes($sa_success) ?>',
+                });
+            <?php endif; ?>
+            
+            <?php if (!empty($form_errors_for_sa)): ?>
+                let errorList = '<ul style="text-align: left;">';
+                <?php foreach ($form_errors_for_sa as $error): ?>
+                    errorList += '<li><?= addslashes($error) ?></li>';
+                <?php endforeach; ?>
+                errorList += '</ul>';
+                
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Form Errors',
+                    html: errorList,
+                });
+            <?php endif; ?>
         });
     </script>
 </body>

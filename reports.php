@@ -1,50 +1,24 @@
 <?php
-// Session is now started by config.php
-// session_start();
-
-// Verify the session file exists and is writable
-// This check might be problematic if session.save_path is not standard or accessible for direct check.
-// Consider removing if it causes issues or if server config ensures writability.
-// For now, commenting out as config.php handles session start, and this check might be too strict/problematic.
-/*
-if (!file_exists(session_save_path()) || !is_writable(session_save_path())) {
-die('Session directory not writable: ' . session_save_path());
-*/
-
-// Standardize session check
-// config.php should be included first to make BASE_URL available.
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/helpers/auth.php'; // Include the new auth helpers
 
-// Session path debugging block removed.
-
-// BASE_URL is now expected to be reliably defined in config.php, so local fallback is removed.
-
 if (!isset($_SESSION['user']['id'])) { // Check the new session structure
-    // Redirect to landing page if not logged in, as login page is for explicit login action.
-    // Or, redirect to login page if that's preferred flow. Landing page seems more user-friendly.
+    // Redirect to landing page if not logged in
     header("Location: " . BASE_URL . "landing.php");
     exit;
 }
-
-// $pdo is already available from config.php, so no need for includes/database.php or $pdo=$conn;
-
-// Debug session - focus on the user part
 error_log("Index session data for user: " . print_r($_SESSION['user'] ?? 'No user session', true));
 
 // Check if the user has the required role(s) for this admin dashboard
 if (!has_role(['Core Admin', 'Administrator'])) {
-    // If logged in but not an admin/core_admin, redirect to landing or a member dashboard.
-    $_SESSION['error_message'] = "You do not have permission to access this dashboard."; // Use the new session key
-    // Potentially redirect to a member-specific dashboard if one exists and user is a member
+    $_SESSION['error_message'] = "You do not have permission to access this dashboard.";
     if (has_role('Member') && isset($_SESSION['user']['member_id'])) {
-        header('Location: ' . BASE_URL . 'members/my_savings.php'); // Example member page
+        header('Location: ' . BASE_URL . 'members/my_savings.php');
     } else {
-        header('Location: ' . BASE_URL . 'landing.php'); // Default redirect for non-privileged users
+        header('Location: ' . BASE_URL . 'landing.php');
     }
     exit;
 }
-
 
 // Verify database connection
 try {
@@ -213,10 +187,7 @@ try {
         
         body {
             background-color: #f8f9fc;
-           /* font-family: 'Nunito', -apple-system, BlinkMacSystemFont, sans-serif; */
         }
-        
-    
         
         .card {
             border: none;
@@ -341,10 +312,10 @@ try {
                             <button type="button" class="btn btn-sm btn-outline-secondary" onclick="window.print()">
                                 <i class="bi bi-printer me-1"></i> Print
                             </button>
-                            <button type="button" class="btn btn-sm btn-outline-primary" id="exportExcel">
+                            <button type="button" class="btn btn-sm btn-outline-primary export-excel">
                                 <i class="bi bi-file-earmark-excel me-1"></i> Excel
                             </button>
-                            <button type="button" class="btn btn-sm btn-outline-danger" id="exportPDF">
+                            <button type="button" class="btn btn-sm btn-outline-danger export-pdf">
                                 <i class="bi bi-file-earmark-pdf me-1"></i> PDF
                             </button>
                         </div>
@@ -634,8 +605,8 @@ try {
                                 <i class="bi bi-three-dots-vertical text-gray-400"></i>
                             </a>
                             <ul class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="dropdownMenuLink">
-                                <li><a class="dropdown-item" href="#" id="exportExcel"><i class="bi bi-file-earmark-excel me-2"></i>Export to Excel</a></li>
-                                <li><a class="dropdown-item" href="#" id="exportPDF"><i class="bi bi-file-earmark-pdf me-2"></i>Export to PDF</a></li>
+                                <li><a class="dropdown-item export-excel" href="#"><i class="bi bi-file-earmark-excel me-2"></i>Export to Excel</a></li>
+                                <li><a class="dropdown-item export-pdf" href="#"><i class="bi bi-file-earmark-pdf me-2"></i>Export to PDF</a></li>
                                 <li><a class="dropdown-item" href="#" onclick="window.print()"><i class="bi bi-printer me-2"></i>Print Report</a></li>
                             </ul>
                         </div>
@@ -749,66 +720,102 @@ try {
     <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
 
     <script>
-      
-            $('#dataTable').DataTable({
-                responsive: true,
-                dom: '<"top"lf>rt<"bottom"ip>',
-                language: {
-                    search: "_INPUT_",
-                    searchPlaceholder: "Search records...",
-                    lengthMenu: "Show _MENU_ entries",
-                    info: "Showing _START_ to _END_ of _TOTAL_ entries",
-                    paginate: {
-                        first: "First",
-                        last: "Last",
-                        next: "Next",
-                        previous: "Previous"
-                    }
-                }
-            });
-            
-            // Export to Excel
-            $('#exportExcel').click(function() {
-                const table = document.getElementById('dataTable');
-                const workbook = XLSX.utils.table_to_book(table, {sheet: "Report"});
-                XLSX.writeFile(workbook, '<?= $report_type ?>_report_<?= date('Ymd') ?>.xlsx');
-            });
-            
-            // Export to PDF
-            $('#exportPDF').click(function() {
-                const { jsPDF } = window.jspdf;
-                const doc = new jsPDF();
-                
-                doc.text('<?= ucfirst($report_type) ?> Report - <?= date('M j, Y') ?>', 14, 15);
-                doc.autoTable({
-                    html: '#dataTable',
-                    startY: 25,
-                    theme: 'grid',
-                    headStyles: {
-                        fillColor: [78, 115, 223],
-                        textColor: 255,
-                        fontStyle: 'bold'
-                    },
-                    alternateRowStyles: {
-                        fillColor: [248, 249, 252]
-                    }
-                });
-                
-                doc.save('<?= $report_type ?>_report_<?= date('Ymd') ?>.pdf');
-            });
-            
-            // Date validation
-            $('form').submit(function(e) {
-                const fromDate = new Date($('[name="from_date"]').val());
-                const toDate = new Date($('[name="to_date"]').val());
-                
-                if (fromDate > toDate) {
-                    alert('End date must be after start date!');
-                    e.preventDefault();
-                }
-            });
+$(document).ready(function() {
+    // Initialize DataTable
+    $('#dataTable').DataTable({
+        responsive: true,
+        dom: '<"top"lf>rt<"bottom"ip>',
+        language: {
+            search: "_INPUT_",
+            searchPlaceholder: "Search records...",
+            lengthMenu: "Show _MENU_ entries",
+            info: "Showing _START_ to _END_ of _TOTAL_ entries",
+            paginate: {
+                first: "First",
+                last: "Last",
+                next: "Next",
+                previous: "Previous"
+            }
+        }
+    });
+    
+    function extractText(html) {
+        return $('<div>').html(html).text().trim();
+    }
+
+    // Export to Excel
+    $('.export-excel').click(function() {
+        const table = $('#dataTable').DataTable();
+        const data = table.rows({ search: 'applied' }).data().toArray();
+        const columns = table.columns().header().toArray().map(th => extractText(th.innerHTML));
+
+        const wb = XLSX.utils.book_new();
+        const excelData = [
+            columns,
+            ...data.map(row => columns.map((col, i) => extractText(row[i])))
+        ];
+        const ws = XLSX.utils.aoa_to_sheet(excelData);
+        XLSX.utils.book_append_sheet(wb, ws, "Report");
+        XLSX.writeFile(wb, '<?= $report_type ?>_report_<?= date('Ymd') ?>.xlsx');
+    });
+
+    // Export to PDF
+    $('.export-pdf').click(function() {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('p', 'pt');
+        const table = $('#dataTable').DataTable();
+        const data = table.rows({ search: 'applied' }).data().toArray();
+        const columns = table.columns().header().toArray().map(th => extractText(th.innerHTML));
+        const body = data.map(row => columns.map((col, i) => extractText(row[i])));
+
+        doc.setFontSize(16);
+        doc.text('<?= ucfirst($report_type) ?> Report - <?= date('M j, Y') ?>', 40, 40);
+        let yPosition = 60;
+        if ('<?= $report_type ?>' !== 'members') {
+            doc.text(`Date Range: ${$('[name="from_date"]').val()} to ${$('[name="to_date"]').val()}`, 40, yPosition);
+            yPosition += 20;
+        }
+        const memberSelect = $('[name="member_id"]');
+        if (memberSelect.val() && '<?= $report_type ?>' !== 'members') {
+            const selectedMember = memberSelect.find('option:selected').text();
+            doc.text(`Member: ${selectedMember}`, 40, yPosition);
+            yPosition += 20;
+        }
+        if ('<?= $report_type ?>' === 'loans' && $('[name="status"]').val()) {
+            const status = $('[name="status"] option:selected').text();
+            doc.text(`Status: ${status}`, 40, yPosition);
+            yPosition += 20;
+        }
+        doc.autoTable({
+            head: [columns],
+            body: body,
+            startY: yPosition + 20,
+            theme: 'grid',
+            headStyles: {
+                fillColor: [78, 115, 223],
+                textColor: 255,
+                fontStyle: 'bold'
+            },
+            alternateRowStyles: {
+                fillColor: [248, 249, 252]
+            },
+            margin: { top: yPosition + 20 }
         });
+        doc.save('<?= $report_type ?>_report_<?= date('Ymd') ?>.pdf');
+    });
+
+    // Date validation
+    $('form').submit(function(e) {
+        const fromDate = new Date($('[name="from_date"]').val());
+        const toDate = new Date($('[name="to_date"]').val());
+        
+        if (fromDate > toDate) {
+            alert('End date must be after start date!');
+            e.preventDefault();
+        }
+    });
+});
     </script>
-     <?php include 'partials/footer.php'; ?>
+    <?php include 'partials/footer.php'; ?>
 </body>
 </html>
