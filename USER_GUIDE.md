@@ -2,187 +2,606 @@
 
 ## 1. Introduction
 
-Welcome to the Rukindo Kweyamba Savings System! This guide will help you understand how to use the platform, whether you are a member or an administrator.
+Welcome to the Rukindo Kweyamba Savings System! This comprehensive guide will help you understand how to use the platform effectively, whether you are a member or an administrator.
 
-The system is designed to help manage savings, process loans, and maintain member records efficiently and transparently.
+The system is designed to help manage savings, process loans, maintain member records, and provide detailed reporting for transparent financial management.
+
+### 1.1 System Features Overview
+
+- **Member Management**: Registration, profile management, and member tracking
+- **Savings Management**: Deposit requests, savings tracking, and performance analytics
+- **Loan Management**: Loan applications, approvals, repayment tracking
+- **Financial Reports**: Comprehensive reporting with export capabilities
+- **Dashboard Analytics**: Real-time statistics and visual charts
+- **Security**: Role-based access control and secure authentication
+- **Notifications**: Email notifications for important events
+- **Calendar**: Event and reminder management
 
 ## 2. Getting Started
 
-### 2.1. Accessing the System
+### 2.1. System Requirements
 
-You can access the system by navigating to the following URL in your web browser:
-`http://your-domain.com/savingssystem/` (Replace `http://your-domain.com/savingssystem/` with the actual URL provided by your administrator, e.g., `http://localhost/savingssystem/`).
+**Server Requirements:**
+- PHP 7.4 or higher
+- MySQL 5.7 or higher
+- Apache/Nginx web server
+- PDO PHP extension enabled
 
-You will typically land on the `landing.php` page.
+**Client Requirements:**
+- Modern web browser (Chrome, Firefox, Safari, Edge, brave etc)
+- Apache server and MySQL running (XAMPP)
+-Internet connection(In the next future when the system goes live)
+- JavaScript enabled
 
-### 2.2. Account Registration (For New Members)
+### 2.2. Accessing the System
 
-If you are a new member and self-registration is enabled:
+The system runs on a web server with the following access points:
 
-1.  Navigate to the registration page. This is often linked from the landing page or accessible via a URL like `auth/register.html` or `members/register.php`.
-2.  Fill in the required details:
-    *   Full Name
-    *   Email Address (this will be your username)
-    *   Password (choose a strong one)
-    *   Confirm Password
-    *   Other details as requested (e.g., phone number, address).
-3.  Submit the registration form.
-4.  You may need to activate your account via an email sent to your registered email address. Check your inbox (and spam folder) for an activation link.
+**Local Development:**
+- URL: `http://localhost/savingssystem/`
+- Landing page: `landing.php`
 
-*If self-registration is not enabled, an administrator will create an account for you.*
+**Production Environment:**
+- URL: `domain name not secured yet`
+- 
 
-### 2.3. Logging In
+### 2.3. Account Registration (For New Members)
 
-1.  Go to the login page, usually accessible from the landing page or directly via `auth/login.php`.
-2.  Enter your **Email Address** and **Password**.
-3.  Click the "Login" button.
-4.  If you've forgotten your password, use the "Forgot Password?" link on the login page to initiate a password reset process (you'll receive an email with instructions).
+**Registration Process:**
+1. Registration is currently done by only admnistrators
+Navigate to the registration page (`members/register.php`)
+2. Fill in required details:
+   - Full Name
+   - Email Address (will be your username)
+   - Phone Number
+   - Password (minimum 8 characters)
+   - Confirm Password
+   - National ID Number (NIN)
+   - Address Information
+3. Submit the registration form
+4. Registered member should check email email for activation instructions
+5. Click the activation link to activate your account
 
-Upon successful login, you will be redirected to your respective dashboard.
+**Administrator Registration:**
+- If self-registration is disabled, contact an administrator
+- Admin will create your account and provide login credentials
+
+### 2.4. Logging In
+
+1. Go to the login page (`auth/login.php`)
+2. Enter your **Email Address** and **Password**
+3. Click "Login"
+4. For forgotten passwords, use "Forgot Password?" link
+5. Follow email instructions to reset your password
+
+**First-Time Login:**
+- Change your default password immediately
+- Update your profile information
+- Review system notifications
 
 ## 3. For Members
 
 ### 3.1. Member Dashboard Overview
 
-After logging in, you'll be taken to your member dashboard (e.g., `members/my_savings.php` or a similar page). This page typically shows:
+**Dashboard Features:**
+- **Savings Summary**: Current balance, recent transactions
+- **Loan Overview**: Active loans, repayment schedules
+- **Quick Actions**: Request deposit, make repayment, view statements
+- **Notifications**: Important system messages
+- **Performance Charts**: Savings growth visualization
 
-*   A summary of your savings.
-*   Information about your active loans.
-*   Navigation links to other member sections.
+**Navigation Menu:**
+- My Savings
+- My Loans
+- Profile
+- Calendar
+- Reports
 
-### 3.2. Managing Your Profile (`profile.php`)
+### 3.2. Profile Management (`profile.php`)
 
-*   You can view and update your personal information.
-*   To change your password, there might be a separate option or it might be part of the profile edit page.
-*   Keep your contact information up-to-date.
+**Profile Features:**
+- **Personal Information**: Name, email, phone, address
+- **Profile Photo**: Upload and manage profile picture
+- **Password Change**: Secure password updates
+- **Contact Preferences**: Notification settings
+- **Security Settings**: Two-factor authentication (if enabled)
+
+**Updating Profile:**
+1. Navigate to Profile section
+2. Click "Edit Profile"
+3. Update required fields
+4. Save changes
+5. Confirm updates via email if required
 
 ### 3.3. Savings Management
 
-*   **Making a Deposit / Requesting Deposit (`members/request_deposit.php` or `savings/deposit.php`):**
-    *   Navigate to the "Make Deposit" or "Request Deposit" section.
-    *   Enter the amount you wish to deposit.
-    *   You might need to upload proof of payment (e.g., a receipt screenshot).
-    *   Submit the request. An administrator will then verify and approve the deposit.
-*   **Viewing Savings Balance and History (`members/my_savings.php`, `savings/transactions.php`):**
-    *   Your current savings balance is usually displayed on your dashboard.
-    *   You can view a detailed list of all your savings transactions, including dates, amounts, and types (deposit, withdrawal if applicable).
-*   **Savings Performance (`members/savings_performance.php`):**
-    *   This section might show charts or summaries of your savings activity over time.
+#### 3.3.1 Making Deposits (`members/request_deposit.php`)
+
+**Deposit Process:**
+1. Navigate to "Request Deposit"
+2. Enter deposit amount
+3. Select payment method
+4. Upload proof of payment (receipt/screenshot)
+5. Add transaction notes (optional)
+6. Submit request for admin approval
+
+
+#### 3.3.2 Viewing Savings (`members/my_savings.php`)
+
+**Savings Dashboard:**
+- **Current Balance**: Real-time savings balance
+- **Transaction History**: Detailed transaction log
+- **Monthly Performance**: Savings growth charts
+
+**Transaction Details:**
+- Date and time
+- Amount
+- Transaction type
+- Status (pending, approved, rejected)
+- Reference number
+- Supporting documents
+
+#### 3.3.3 Savings Performance (`members/savings_performance.php`)
+
+**Performance Metrics:**
+- Monthly savings trends
+- Year-over-year growth
+- Average monthly deposits
+
+**Visual Analytics:**
+- Line charts for trends
+- Bar charts for comparisons
+- Pie charts for distribution
+- Progress bars for goals
 
 ### 3.4. Loan Management
 
-*   **Applying for a Loan (`loans/apply_loan.php` or `members/my_loans.php` then "Apply"):**
-    *   Go to the "Apply for Loan" section.
-    *   Fill out the loan application form, which may include:
-        *   Loan amount requested.
-        *   Reason for the loan.
-        *   Proposed repayment period.
-        *   Guarantor information (if required).
-    *   Submit the application. It will be sent to administrators for review.
-*   **Viewing Loan Status and Repayment Schedule (`members/my_loans.php`, `loans/viewloan.php`):**
-    *   You can track the status of your loan applications (pending, approved, rejected).
-    *   For approved loans, you can view the details, including the principal amount, interest, total payable, and the repayment schedule.
-*   **Making Loan Repayments (`members/add_loan_repayment.php`):**
-    *   Navigate to the loan repayment section.
-    *   Select the loan you want to make a payment for.
-    *   Enter the repayment amount.
-    *   Provide proof of payment if required.
-    *   Submit the repayment. Administrators will verify and update your loan balance.
+#### 3.4.1 Applying for Loans (`loans/apply_loan.php`)
 
-### 3.5. Calendar (`usercalendar.php`)
-*   This section may display important dates, payment reminders, or group events.
+**Application Process:**
+1. Navigate to "Apply for Loan"
+2. Fill out application form:
+   - Loan amount requested
+   - Loan purpose
+   - Proposed repayment period
+   - Guarantor information
+   - Supporting documents
+3. Review terms and conditions
+4. Submit application
+5. Track application status
+
+**Required Documents:**
+- Loan application form
+- Proof of income
+- Guarantor details
+- Collateral information (if applicable)
+
+#### 3.4.2 Loan Tracking (`members/my_loans.php`)
+
+**Loan Dashboard:**
+- **Active Loans**: Current loan details
+- **Loan History**: Past loan records
+- **Repayment Schedule**: Upcoming payments
+- **Outstanding Balance**: Current amounts due
+- **Interest Calculations**: Interest accrued
+
+**Loan Status Types:**
+- Pending: Under review
+- Approved: Loan approved, funds disbursed
+- Active: Loan being repaid
+- Completed: Fully paid
+- Defaulted: Overdue payments
+- Rejected: Loan not approved
+
+#### 3.4.3 Loan Repayments (`members/add_loan_repayment.php`)
+
+**Repayment Process:**
+1. Select loan to repay
+2. Enter repayment amount
+3. Choose payment method
+4. Upload proof of payment
+5. Submit for verification
+6. Track repayment status
+
+**Repayment Options:**
+- Full payment
+- Partial payment
+- Minimum payment
+- Extra payment
+
+### 3.5. Reports and Statements
+
+**Available Reports:**
+- **Savings Report**: Detailed savings transaction history
+- **Loan Report**: Loan details and repayment history
+- **Savings Summary**: Monthly/yearly savings reports
+- **Members report**: Information about registered members
+**Export Options:**
+- PDF format
+- Excel format
+- CSV format
+- Print-friendly version
+
+### 3.6. Calendar (`usercalendar.php`)
+
+**Calendar Features:**
+- **Payment Reminders**: Loan repayment due dates
+- **Group Events**: Meeting schedules
+- **System Maintenance**: Planned downtime
+- **Important Dates**: Deadlines and milestones
 
 ## 4. For Administrators
 
-Upon logging in with an administrator account, you'll be directed to the Admin Dashboard (`index.php`).
-
 ### 4.1. Admin Dashboard Overview (`index.php`)
 
-The admin dashboard provides:
+**Dashboard Statistics:**
+- Total members count
+- Total savings amount
+- Active loans count
+- Pending applications
+- System health metrics
 
-*   **Key Statistics:** Total members, total savings, number of active loans, etc.
-*   **Quick Actions:** Links to common administrative tasks like registering a new member, recording savings, or processing a loan.
-*   **Recent Activity:** Possibly a list of recent transactions or loan applications.
-*   **Navigation Menu (Sidebar):** Access to all administrative modules.
+**Quick Actions:**
+- Register new member
+- Process loan applications
+- Approve deposit requests
+- Generate reports
+- System settings
 
-### 4.2. User Management
+**Visual Analytics:**
+- Monthly savings trends
+- Top saving members
+- Loan portfolio distribution
+- Member activity charts
 
-*   **Viewing and Managing Members (`admin/user_management/index.php`, `members/memberslist.php`):**
-    *   List all registered users/members.
-    *   View individual member details (`members/view.php`).
-    *   Edit member information (`members/edit.php`).
-    *   Activate/deactivate accounts.
-    *   Convert a general user to a member (`admin/user_management/convert_member.php`).
-*   **Managing User Details (`admin/user_management/manage_user_details.php`):**
-    *   More specific user detail management.
-*   **Roles and Permissions (Conceptual - `includes/rbac.php` suggests this exists):**
-    *   The system uses roles (e.g., 'Core Admin', 'Administrator', 'Member'). While direct UI for managing roles/permissions isn't explicitly listed in filenames for admins, the `settings/` area might contain this.
+### 4.2. Member Management
 
-### 4.3. Group Management (`admin/group_management/`)
+#### 4.2.1 Member Registration (`members/register.php`)
 
-*   **Creating and Managing Groups (`admin/group_management/index.php`):**
-    *   If the system supports sub-groups within the savings scheme.
-    *   Assign users to groups (`assign_users.php`).
-    *   Edit (`edit_group.php`) or delete (`delete_group.php`) groups.
+**Admin Registration:**
+1. Navigate to "Add Member"
+2. Fill member details:
+   - Personal information
+   - Contact details
+   - Initial savings amount
+   - Member category
+3. Generate member ID
+4. Send welcome email
+5. Print member card
 
-### 4.4. Loan Management (Admin Perspective)
+#### 4.2.2 Member Management (`members/memberslist.php`)
 
-*   **Loan Applications List (`admin/loans/loan_applications_list.php`):**
-    *   View all pending loan applications.
-*   **Viewing and Processing Loan Applications (`admin/loans/view_loan_application.php`):**
-    *   Review application details.
-    *   Approve, reject, or request more information for loan applications.
-    *   Set loan terms if approved (e.g., interest rate, repayment schedule if not auto-calculated).
-*   **Managing Existing Loans (`loans/loanslist.php` for all, then `loans/editloan.php` or `loans/viewloan.php`):**
-    *   View all active and past loans.
-    *   Record repayments made by members.
-    *   Adjust loan details if necessary (with caution and proper authorization).
-    *   Mark loans as fully paid.
+**Member Operations:**
+- **View Member**: Detailed member profile
+- **Edit Member**: Update member information
+- **Activate/Deactivate**: Account status management
+- **Convert User**: Convert user to member
+- **Delete Member**: Remove member (with restrictions)
 
-### 4.5. Savings Management (Admin Perspective)
+**Member Search and Filter:**
+- Search by name, email, or member ID
+- Filter by status, date joined, or group
+- Sort by various criteria
+- Export member list
 
-*   **Viewing All Savings (`savings/savingslist.php`):**
-    *   Get an overview of all member savings.
-    *   Verify and approve deposit requests made by members.
-*   **Recording Savings (`savings/savings.php` or `savings/deposit.php`):**
-    *   Manually record savings on behalf of members if needed.
-*   **Viewing Transactions (`savings/transactions.php`):**
-    *   See a global list of all savings transactions.
-*   **Generating Receipts (`savings/generate_request_receipt.php`, `savings/printreceipt.php`):**
-    *   Create and print receipts for savings transactions.
+### 4.3. Savings Management (Admin)
 
-### 4.6. System Settings (`admin/system_settings/` and `settings/`)
+#### 4.3.1 Deposit Approval (`savings/savingslist.php`)
 
-*   **General Settings (`admin/system_settings/index.php`, `admin/system_settings/update_settings.php`):**
-    *   Configure application name, currency, and other general parameters.
-    *   Manage savings year (e.g., `start_savings_year.php`, `close_savings_year.php`).
-*   The `settings/` directory (e.g. `settings/index.php`, `settings/general.php`) appears to be a newer or alternative settings area. Explore this for more configuration options related to:
-    *   Dashboard settings (`settings/dashboard.php`)
-    *   Group settings (`settings/groups.php`)
-    *   User role and permission settings (`settings/permissions.php`, `settings/roles.php`, `settings/users.php`)
+**Approval Process:**
+1. Review deposit requests
+2. Verify supporting documents
+3. Check payment proof
+4. Approve or reject request
+5. Send notification to member
+6. Update member balance
 
-### 4.7. Reports (`reports.php`)
+**Batch Processing:**
+- Approve multiple deposits
+- Bulk import from CSV
 
-*   Generate various reports, such as:
-    *   Member statements.
-    *   Loan portfolio reports.
-    *   Savings summaries.
-    *   Transaction logs.
-*   Reports are often downloadable as PDFs.
+#### 4.3.2 Savings Transactions (`savings/transactions.php`)
 
-### 4.8. Calendar (`calendar.php`)
-*   View and manage a system-wide calendar for events, deadlines, or important notices.
+**Transaction Management:**
+- View all transactions
+- Filter by date, member, or type
+- Edit transaction details
+- Reverse transactions (with authorization)
+- Generate transaction reports
 
-## 5. Troubleshooting/FAQ
+### 4.4. Loan Management (Admin)
 
-*   **Q: I can't log in.**
-    *   A: Double-check your email and password. Use the "Forgot Password?" link if needed. Ensure your account is activated. Contact an administrator if problems persist.
-*   **Q: My deposit/repayment isn't reflecting.**
-    *   A: Deposits and repayments often require administrator approval. Allow some time for verification. If it takes too long, contact an administrator with your transaction details.
-*   **Q: How do I change my email address?**
-    *   A: Check your profile page. If the option isn't available, you may need to request an administrator to update it for you, as it's often tied to your login.
+#### 4.4.1 Loan Applications (`admin/loans/loan_applications_list.php`)
 
-## 6. Contact/Support
+**Application Review:**
+1. Review application details
+2. Verify member eligibility
+3. Check guarantor information
+4. Calculate loan terms
+5. Approve, reject, or request more info
+6. Set repayment schedule
 
-If you encounter issues or have questions not covered in this guide, please contact your system administrator or the designated support person for the Rukindo Kweyamba Savings System.
-Provide as much detail as possible about your issue, including screenshots if helpful.
+**Loan Evaluation Criteria:**
+- Member savings history
+- Previous loan performance
+- Guarantor verification
+- Loan-to-savings ratio
+- Risk assessment
+
+#### 4.4.2 Loan Portfolio (`loans/loanslist.php`)
+
+**Portfolio Management:**
+- View all loans by status
+- Track repayment performance
+- Identify overdue loans
+- Generate portfolio reports
+- Risk analysis and monitoring
+
+**Loan Operations:**
+- Restructure loans
+- Waive penalties (with authorization)
+- Write-off bad loans
+- Transfer loans between members
+
+### 4.5. Financial Reports (`reports.php`)
+
+**Report Types:**
+- **Member Statements**: Individual member reports
+- **Loan Reports**: Loan portfolio analysis
+- **Savings Reports**: Savings performance summaries
+- **Financial Statements**: Balance sheets, P&L
+- **Audit Reports**: Transaction audit trails
+
+**Report Features:**
+- Date range selection
+- Member filtering
+- Status filtering
+- Export to PDF/Excel
+- Automated report scheduling
+- Email distribution
+
+### 4.6. System Settings
+
+#### 4.6.1 General Settings (`admin/system_settings/`)
+
+**System Configuration:**
+- Application name and logo
+- Currency settings
+- Interest rate settings
+- Loan parameters
+- Email configuration
+- Backup settings
+
+#### 4.6.2 User Management (`settings/users.php`)
+
+**User Administration:**
+- Create administrator accounts
+- Manage user roles and permissions
+- Reset user passwords
+- Lock/unlock accounts
+- View user activity logs
+
+#### 4.6.3 Group Management (`admin/group_management/`)
+
+**Group Features:**
+- Create member groups
+- Assign users to groups
+- Set group-specific settings
+- Group performance tracking
+- Group reporting
+
+### 4.7. System Maintenance
+
+**Maintenance Tasks:**
+- **Database Backup**: Regular  backups
+- **System Updates**: Software updates and patches
+- **Performance Monitoring**: System health checks
+- **Security Audits**: Regular security assessments
+- **Data Cleanup**: Archive old data
+
+**Monitoring Features:**
+- System performance metrics
+- Error logging and monitoring
+- User activity tracking
+- Security event logging
+
+## 5. Security Features
+
+### 5.1. Authentication
+
+**Security Measures:**
+- Strong password requirements
+- Account lockout after failed attempts
+- Session timeout management
+- Two-factor authentication (optional)
+- Password reset security
+
+### 5.2. Data Protection
+
+**Privacy Features:**
+- Data encryption in transit and at rest
+- Regular security backups
+- Access logging and monitoring
+- GDPR compliance features
+- Data retention policies
+
+### 5.3. Role-Based Access Control
+
+**User Roles:**
+- **Core Admin**: Full system access
+- **Administrator**: Administrative functions
+- **Member**: Limited member functions
+- **Viewer**: Read-only access of the landing page
+
+**Permission System:**
+- Granular permission control
+- Role-based feature access
+
+## 6. Mobile and Browser Support
+
+### 6.1. Browser Compatibility
+
+**Supported Browsers:**
+- Chrome 90+
+- Firefox 88+
+- Safari 14+
+- Edge 90+
+- Opera 76+
+- etc
+
+### 6.2. Mobile Responsiveness
+
+**Mobile Features:**
+- Responsive design for all screen sizes
+- Touch-friendly interface
+- Mobile-optimized forms
+- Fast loading on mobile networks
+- Offline capability (limited)
+
+## 7. Troubleshooting
+
+### 7.1. Common Issues
+
+**Login Problems:**
+- Check email and password
+- Clear browser cache
+- Verify account activation
+- Check internet connection
+- Contact administrator if locked out
+
+**Transaction Issues:**
+- Allow time for admin approval
+- Check supporting documents
+- Verify payment proof
+- Contact support with transaction details
+
+**System Performance:**
+- Clear browser cache
+- Check internet speed
+- Try different browser
+- Report persistent issues
+
+### 7.2. Error Messages
+
+**Common Error Messages:**
+- "Invalid username or password." : Using incorrect user name or password
+- "Session expired": Log in again
+- "Access denied": Check user permissions
+- "Database error": Contact administrator
+- "File upload error": Check file size and format
+- "Invalid data": Review form inputs
+
+### 7.3. Getting Help
+
+**Support Channels:**
+- System administrator contact
+- User manual and documentation
+- FAQ section
+- Email support
+
+**When Contacting Support:**
+- Provide detailed error description
+- Include screenshots if helpful
+- Mention browser and device used
+- Provide transaction reference numbers
+- Describe steps taken before error
+
+## 8. Best Practices
+
+### 8.1. For Members
+
+**Security Best Practices:**
+- Use strong, unique passwords
+- Log out after each session
+- Don't share login credentials
+- Report suspicious activity
+- Keep contact information updated
+
+**Financial Best Practices:**
+- Make regular savings deposits
+- Keep payment receipts
+- Monitor account statements
+- Pay loans on time
+
+### 8.2. For Administrators
+
+**Management Best Practices:**
+- Regular system backups
+- Monitor system performance
+- Review user access regularly
+- Keep software updated
+- Maintain audit trails
+
+**Financial Best Practices:**
+- Regular financial reconciliation
+- Monitor loan portfolio health
+- Review interest rates regularly
+- Maintain adequate reserves
+- Generate regular reports
+
+## 9. System Limitations
+
+### 9.1. Current Limitations
+
+**Technical Limitations:**
+- Local server deployment only
+- Manual backup process
+- Limited mobile app features
+- Single currency support
+- Basic reporting templates
+
+**Functional Limitations:**
+- No automated loan scoring
+- Limited integration options
+- Basic notification system
+- Manual approval processes
+- Limited customization options
+
+### 9.2. Future Enhancements
+
+**Planned Features:**
+- Mobile application
+- Advanced reporting
+- Automated notifications
+- Integration with banks and mobile money
+- Multi-currency support
+- Advanced analytics
+
+## 10. Appendices
+
+### Appendix A: System Requirements
+- Detailed technical specifications
+- Installation requirements
+- Configuration guidelines
+
+### Appendix B: API Documentation
+- Available API endpoints
+- Authentication methods
+- Data formats
+
+### Appendix C: Database Schema
+- Table structures
+- Relationships
+- Data types
+
+### Appendix D: Change Log
+- Version history
+- Feature updates
+- Bug fixes
+
+---
+
+**Document Version**: 2.0  
+**Last Updated**: August 03, 2025  
+**Contact**: System Administrator  
+**Support Email**: isaacvital44@gmail.com
+contact us incase of any issue not working as expected or notes in this user manual guide
+thank you!
+we are the nerds!
+## copyrights holders
+1. Isaac Mukonyezi
+2. Bakaruba Anold
+3. Kyogabire Lucky
+4. Muwanika Eric
+5. Masinde Doreen
+6. UICT Mgt 
